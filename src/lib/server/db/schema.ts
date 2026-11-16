@@ -513,4 +513,22 @@ export const chickBatchReportSnapshot = mysqlTable(
 	(t) => [index('cbrs_created_at_idx').on(t.createdAt)]
 );
 
+// ---------------------------------------------------------------------------
+// Particulars
+// ---------------------------------------------------------------------------
+export const particulars = mysqlTable(
+	'particulars',
+	{
+		id: varchar('id', { length: 36 }).primaryKey(),
+		name: varchar('name', { length: 150 }).notNull(),
+		qty: int('qty').notNull().default(0),
+		price: decimal('price', { precision: 14, scale: 2 }).notNull().default('0'),
+		// Signed integer: positive = add days, negative = subtract days, null = no adjustment.
+		adjustmentDays: int('adjustment_days'),
+		createdAt: timestamp('created_at').defaultNow().notNull(),
+		updatedAt: timestamp('updated_at').defaultNow().onUpdateNow().notNull()
+	},
+	(t) => [index('particulars_name_idx').on(t.name)]
+);
+
 export * from './auth.schema';

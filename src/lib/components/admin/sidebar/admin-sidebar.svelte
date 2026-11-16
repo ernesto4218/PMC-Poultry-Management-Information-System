@@ -25,7 +25,10 @@
 		MapPinHouseIcon,
 		Newspaper,
 		Bird,
-		Birdhouse
+		Birdhouse,
+		MemoryStickIcon,
+		ListOrdered,
+		CpuIcon
 	} from '@lucide/svelte';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
@@ -85,8 +88,24 @@
 					children: [
 						{ title: 'CCS', url: '/admin/med-guide/ccs', icon: SquareBookmark },
 						{ title: 'CON', url: '/admin/med-guide/con', icon: SquareBookmark },
-						{ title: 'Memory', url: '/admin/med-guide/memory', icon: BookDashed },
+						{ title: 'Memory', url: '/admin/med-guide/memory', icon: MemoryStickIcon },
 						{ title: 'Reports', url: '/admin/med-guide/med-reports', icon: Newspaper }
+					]
+				},
+				{
+					title: 'Budget Placement',
+					url: '/admin/budget-placement',
+					icon: Wallet,
+					children: [
+						{ title: 'Particulars', url: '/admin/budget-placement/particulars', icon: ListOrdered },
+						{ title: 'Memory', url: '/admin/budget-placement/memory', icon: MemoryStickIcon },
+						{
+							title: 'Configurations',
+							url: '/admin/budget-placement/configuraion',
+							icon: Settings
+						},
+						{ title: 'Generator', url: '/admin/budget-placement/generator', icon: CpuIcon },
+						{ title: 'Reports', url: '/admin/budget-placement/reports', icon: Newspaper }
 					]
 				}
 			]

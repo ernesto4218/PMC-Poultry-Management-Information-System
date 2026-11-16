@@ -22,6 +22,20 @@
       "when": 1794806683159,
       "tag": "0002_amused_stick",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1794835809190,
+      "tag": "0003_normal_alice",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1794837214617,
+      "tag": "0004_ordinary_squadron_sinister",
+      "breakpoints": true
     }
   ]
 }
