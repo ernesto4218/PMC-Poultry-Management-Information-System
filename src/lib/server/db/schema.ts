@@ -513,7 +513,7 @@ export const chickBatchReportSnapshot = mysqlTable(
 	(t) => [index('cbrs_created_at_idx').on(t.createdAt)]
 );
 
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------
 // Particulars
 // ---------------------------------------------------------------------------
 export const particulars = mysqlTable(
