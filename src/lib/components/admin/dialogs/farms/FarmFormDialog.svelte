@@ -46,7 +46,12 @@
 	);
 
 	const canSave = $derived(
-		form.name.trim() !== '' && form.code.trim() !== '' && !duplicateName && !duplicateCode
+		form.name.trim() !== '' &&
+			form.code.trim() !== '' &&
+			Number.isFinite(form.volume) &&
+			form.volume > 0 &&
+			!duplicateName &&
+			!duplicateCode
 	);
 
 	async function submit(e: SubmitEvent) {
@@ -137,6 +142,20 @@
 						{/each}
 					</Select.Content>
 				</Select.Root>
+			</div>
+
+			<div class="space-y-2">
+				<Label for="volume">Volume <span class="text-red-600">*</span></Label>
+				<Input
+					id="volume"
+					type="number"
+					min="0"
+					step="any"
+					bind:value={form.volume}
+					placeholder="e.g. 5000"
+					required
+					class={inputCls}
+				/>
 			</div>
 
 			<div class="space-y-2">

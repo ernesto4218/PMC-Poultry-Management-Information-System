@@ -4,13 +4,8 @@
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 
-	/**
-	 * schedule:  the snapshot from <MedicationTable onchange>, { medications, days }
-	 * birdCount: farm volume (number of birds)
-	 */
 	let { schedule, birdCount = 0 } = $props();
 
-	// Typed by the user, keyed by medicine id
 	let qty = $state({});
 	let price = $state({});
 
@@ -24,22 +19,27 @@
 
 	const rows = $derived.by(() => {
 		const days = schedule?.days ?? [];
+		const birds = Number(birdCount) || 0;
 		return (schedule?.medications ?? []).map((med) => {
-			// total grams = sum of this medicine's doses over all days
 			const grams = days.reduce((sum, d) => sum + toNum(d.doses?.[med.id]), 0);
 			const amount = toNum(qty[med.id]) * toNum(price[med.id]);
 			return {
 				id: med.id,
 				name: med.name,
 				grams,
+				// total grams spread across the flock
+				perBirdGrams: birds ? grams / birds : 0,
 				kls: grams / 1000,
 				amount,
-				costPerBird: Number(birdCount) ? amount / Number(birdCount) : 0
+				costPerBird: birds ? amount / birds : 0
 			};
 		});
 	});
 
 	const totalAmount = $derived(rows.reduce((sum, r) => sum + r.amount, 0));
+	const totalPerBirdGrams = $derived(
+		Number(birdCount) ? rows.reduce((sum, r) => sum + r.grams, 0) / Number(birdCount) : 0
+	);
 
 	const head =
 		'h-8 border-r border-b border-gray-300 bg-amber-50 px-2 text-center text-xs font-bold text-gray-900';
@@ -49,7 +49,6 @@
 </script>
 
 <div class="overflow-hidden rounded-lg border border-red-100 bg-white shadow-sm">
-	<!-- Toolbar -->
 	<div
 		class="flex flex-wrap items-center gap-2 border-b border-red-100 bg-gradient-to-r from-red-50 to-amber-50 px-3 py-2"
 	>
@@ -59,16 +58,17 @@
 			{rows.length} items
 		</Badge>
 		<p class="hidden text-[11px] text-gray-500 md:block">
-			Grams are totaled from the medication table. Enter Qty and Price.
+			Grams are totaled from the medication table. Per-bird = total ÷ {birdCount || 0} birds.
 		</p>
 	</div>
 
-	<Table.Root class="w-full min-w-[720px] border-separate border-spacing-0 text-xs">
+	<Table.Root class="w-full min-w-[820px] border-separate border-spacing-0 text-xs">
 		<Table.Header>
 			<Table.Row class="border-0 hover:bg-transparent">
 				<Table.Head class="{head} !text-left !text-red-700">VITAMINS</Table.Head>
 				<Table.Head class={head}>grms/ml</Table.Head>
 				<Table.Head class={head}>kls/L</Table.Head>
+				<Table.Head class={head}>grms/ml / Bird</Table.Head>
 				<Table.Head class={head}>Qty</Table.Head>
 				<Table.Head class={head}>Price</Table.Head>
 				<Table.Head class={head}>Amount</Table.Head>
@@ -91,6 +91,9 @@
 
 					<Table.Cell class={cell}>{row.grams ? fmt(row.grams, 0, 2) : '-'}</Table.Cell>
 					<Table.Cell class={cell}>{fmt(row.kls)}</Table.Cell>
+					<Table.Cell class={cell}>
+						{row.perBirdGrams ? fmt(row.perBirdGrams, 2, 4) : '-'}
+					</Table.Cell>
 
 					<Table.Cell class="border-r border-b border-gray-200 p-0">
 						<Input
@@ -119,7 +122,7 @@
 				</Table.Row>
 			{:else}
 				<Table.Row class="hover:bg-transparent">
-					<Table.Cell colspan={7} class="py-6 text-center text-xs text-gray-500">
+					<Table.Cell colspan={8} class="py-6 text-center text-xs text-gray-500">
 						No medicines yet.
 					</Table.Cell>
 				</Table.Row>
@@ -133,6 +136,11 @@
 				>
 				<Table.Cell class="border-t border-gray-300 p-0"></Table.Cell>
 				<Table.Cell class="border-t border-gray-300 p-0"></Table.Cell>
+				<Table.Cell
+					class="border-t border-gray-300 px-2 py-0 text-right text-xs font-bold text-amber-700 tabular-nums"
+				>
+					{fmt(totalPerBirdGrams, 2, 4)}
+				</Table.Cell>
 				<Table.Cell class="border-t border-gray-300 p-0"></Table.Cell>
 				<Table.Cell class="border-t border-gray-300 p-0"></Table.Cell>
 				<Table.Cell

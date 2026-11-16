@@ -4,9 +4,10 @@ export interface Farm {
 	code: string; // Farm code
 	address: string; // Address
 	type: string;
+	volume: number; // Volume
 }
 
-export const farmTypes = ['CON-MAH', 'CCS', 'CON-PAG'];
+export const farmTypes = ['CON', 'CCS'];
 
 export type FarmForm = Omit<Farm, 'id'>;
 
@@ -14,7 +15,8 @@ export const emptyFarmForm = (): FarmForm => ({
 	name: '',
 	code: '',
 	address: '',
-	type: ''
+	type: '',
+	volume: 0
 });
 
 export const farmToForm = (farm: Farm): FarmForm => {

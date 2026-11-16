@@ -333,7 +333,7 @@
 						/>
 						<Input
 							bind:value={search}
-							placeholder="Search batch #, farm, or code…"
+							placeholder="Search Chick In No., farm, or code…"
 							class="h-9 rounded-lg border-gray-300 pl-9 text-sm {inputCls}"
 							aria-label="Search batches"
 						/>
@@ -391,7 +391,7 @@
 							>
 								<!-- Body -->
 								<div class="space-y-3 p-4">
-									<!-- Row 1: batch # + status -->
+									<!-- Row 1: Chick In No. + status -->
 									<div class="flex items-start justify-between gap-2">
 										<span class="truncate font-mono text-xs font-semibold text-gray-900">
 											{o.batch.batchNumber}
@@ -702,7 +702,7 @@
 				<Table.Root>
 					<Table.Header class="bg-stone-50">
 						<Table.Row class="hover:bg-transparent">
-							<Table.Head class={thCls}>Batch #</Table.Head>
+							<Table.Head class={thCls}>Chick In No.</Table.Head>
 							<Table.Head class={thCls}>Farm</Table.Head>
 							<Table.Head class="{thCls} hidden sm:table-cell">Chicks</Table.Head>
 							<Table.Head class="{thCls} hidden md:table-cell">Medicines</Table.Head>

@@ -6,86 +6,79 @@
 	import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down';
 	import MapPin from '@lucide/svelte/icons/map-pin';
 	import MapIcon from '@lucide/svelte/icons/map';
-	import Warehouse from '@lucide/svelte/icons/warehouse';
-	import Hash from '@lucide/svelte/icons/hash';
-	import Tag from '@lucide/svelte/icons/tag';
-	import Pill from '@lucide/svelte/icons/pill';
+	import Bird from '@lucide/svelte/icons/bird';
 	import CalendarPlus from '@lucide/svelte/icons/calendar-plus';
-	import CalendarClock from '@lucide/svelte/icons/calendar-clock';
-	import X from '@lucide/svelte/icons/x';
 	import * as Command from '#lib/components/ui/command/index.ts';
 	import * as Popover from '#lib/components/ui/popover/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { cn } from '#lib/utils.ts';
 	import MedicationTable from '#lib/components/admin/med-guide/medication-table.svelte';
 	import { farmGroupOf } from '#lib/types/medication-memory.ts';
-	import MedicationSummary from '../../../../../lib/components/admin/med-guide/medication-summary.svelte';
-	import { Printer } from '@lucide/svelte';
 	import PrintDialogCcs from '#lib/components/admin/med-guide/print-dialog-ccs.svelte';
+	import Badge from '#lib/components/ui/badge/badge.svelte';
 
 	let pdfElement = $state(null);
-
 	let schedule = $state();
 
 	let { data } = $props();
+
 	const TYPE_STYLES = {
-		CCS: 'bg-red-50 text-red-700 ring-red-600/20',
-		'CON-MAH': 'bg-amber-50 text-amber-700 ring-amber-600/20',
-		'CON-PAG': 'bg-sky-50 text-sky-700 ring-sky-600/20'
+		CCS: 'bg-blue-50 text-blue-700 ring-blue-200',
+		CON: 'bg-red-50 text-red-700 ring-red-200'
 	};
 
-	// "CANIANGAN RAMON MAGSAYSAY ZAMBOANGA DEL SUR" -> { barangay, municipality }
-	function parseAddress(address = '') {
-		const m = address.match(/^(.*?)\s+(RAMON MAGAYSAY|PAGADIAN CITY|MAHAYAG)\s+ZAMBOANGA DEL SUR$/);
-		return m
-			? { barangay: m[1], municipality: m[2] }
-			: { barangay: address, municipality: 'Other' };
-	}
-
 	const toTitle = (s = '') => s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+
 	function formatNumber(value) {
 		const number = Number(value);
 		return number.toLocaleString();
 	}
 
-	// Works whether the date arrives as a Date object or an ISO string
-	function formatDate(value) {
+	// Date-only safe (YYYY-MM-DD or full ISO)
+	function formatDateShort(value) {
 		if (!value) return '—';
-		const d = new Date(value);
-		if (Number.isNaN(d.getTime())) return '—';
-		return new Intl.DateTimeFormat('en-PH', {
-			dateStyle: 'medium',
-			timeStyle: 'short',
-			timeZone: 'Asia/Manila'
-		}).format(d);
+		const s = String(value).slice(0, 10);
+		const parts = s.split('-');
+		if (parts.length !== 3) {
+			const d = new Date(value);
+			return Number.isNaN(d.getTime())
+				? '—'
+				: d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+		}
+		const [y, m, d] = parts.map(Number);
+		if (!y || !m || !d) return '—';
+		return new Date(y, m - 1, d).toLocaleDateString('en-PH', {
+			month: 'short',
+			day: 'numeric',
+			year: 'numeric'
+		});
 	}
 
-	const farms = $derived(data.farms.map((f) => ({ ...f, ...parseAddress(f.address) })));
-
-	// Group by municipality, sort naturally (CANIANGAN 2 before CANIANGAN 10)
+	// Group batches by their farm, farm sorted by name, batches newest first
 	const groups = $derived.by(() => {
 		const map = new Map();
-		for (const f of farms) {
-			if (!map.has(f.municipality)) map.set(f.municipality, []);
-			map.get(f.municipality).push(f);
+		for (const b of data.batches) {
+			if (!map.has(b.farmId)) map.set(b.farmId, { farm: b.farm, batches: [] });
+			map.get(b.farmId).batches.push(b);
 		}
-		return [...map.entries()]
-			.sort(([a], [b]) => a.localeCompare(b))
-			.map(([municipality, items]) => ({
-				municipality,
-				items: items.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+		return [...map.values()]
+			.sort((a, b) => a.farm.name.localeCompare(b.farm.name, undefined, { numeric: true }))
+			.map((g) => ({
+				...g,
+				batches: g.batches.sort((a, b) => b.dateSet.localeCompare(a.dateSet))
 			}));
 	});
 
 	let open = $state(false);
-	let selectedId = $state('');
+	let selectedBatchId = $state('');
 	let triggerRef = $state(null);
 
-	const selected = $derived(farms.find((f) => f.id === selectedId));
-	const group = $derived(selected ? farmGroupOf(selected.type) : null);
+	const selectedBatch = $derived(data.batches.find((b) => b.id === selectedBatchId));
+	const selectedFarm = $derived(selectedBatch?.farm ?? null);
+	const group = $derived(selectedFarm ? farmGroupOf(selectedFarm.type) : null);
 
 	function select(id) {
-		selectedId = id;
+		selectedBatchId = id;
 		open = false;
 		tick().then(() => triggerRef?.focus());
 	}
@@ -133,42 +126,45 @@
 					<p class="text-xs font-semibold tracking-wider text-red-700 uppercase">
 						Chick Management
 					</p>
-					<h1 class="mt-1 text-3xl font-bold tracking-tight text-gray-900">
-						Medication Guide Generator
+					<h1 class="mt-1 flex items-center gap-2 text-3xl font-bold tracking-tight text-gray-900">
+						Medication Guide Generator <Badge
+							class=" bg-blue-50 p-2 text-xs text-blue-700 ring-blue-200">CCS</Badge
+						>
 					</h1>
 					<p class="mt-1 text-sm text-gray-500">
-						Generate a 34-day vaccination and medicine schedule per farm.
+						Generate a 34-day vaccination and medicine schedule per chick batch.
 					</p>
 				</div>
 			</div>
 
-			<!-- FARM SELECT -->
+			<!-- BATCH SELECT -->
 			<div class="flex items-center gap-3">
 				<Popover.Root bind:open>
 					<Popover.Trigger bind:ref={triggerRef}>
 						{#snippet child({ props })}
 							<Button
 								{...props}
-								id="farm-select"
+								id="batch-select"
 								variant="outline"
 								role="combobox"
 								aria-expanded={open}
-								class="h-auto min-h-10 w-full justify-between bg-white py-2 text-left font-normal sm:w-[420px]"
+								class="h-auto min-h-10 w-full justify-between bg-white py-2 text-left font-normal sm:w-[440px]"
 							>
-								{#if selected}
+								{#if selectedBatch}
 									<span class="flex min-w-0 flex-col items-start gap-0.5">
 										<span class="flex items-center gap-2">
-											<span class="truncate font-medium text-gray-900">{selected.name}</span>
-											{@render typeBadge(selected.type)}
+											<span class="truncate font-mono font-semibold text-gray-900">
+												{selectedBatch.batchNumber}
+											</span>
+											{@render typeBadge(selectedFarm?.type)}
 										</span>
 										<span class="truncate text-xs text-gray-500">
-											{selected.code} · {toTitle(selected.barangay)}, {toTitle(
-												selected.municipality
-											)}
+											{selectedFarm?.name} · {formatNumber(selectedBatch.volume)} chicks ·
+											{formatDateShort(selectedBatch.dateSet)}
 										</span>
 									</span>
 								{:else}
-									<span class="text-gray-500">Select a farm…</span>
+									<span class="text-gray-500">Select a chick batch…</span>
 								{/if}
 								<ChevronsUpDown class="ml-2 size-4 shrink-0 opacity-50" />
 							</Button>
@@ -180,43 +176,43 @@
 						align="start"
 					>
 						<Command.Root>
-							<Command.Input placeholder="Search by name, code, type or location…" />
+							<Command.Input placeholder="Search by Chick In No., farm, or date…" />
 							<Command.List class="max-h-[320px]">
-								<Command.Empty>No farm found.</Command.Empty>
+								<Command.Empty>No batch found.</Command.Empty>
 
-								{#each groups as group (group.municipality)}
-									<Command.Group heading={toTitle(group.municipality)}>
-										{#each group.items as farm (farm.id)}
+								{#each groups as g (g.farm.id)}
+									<Command.Group heading={`${g.farm.name} · ${g.farm.code}`}>
+										{#each g.batches as batch (batch.id)}
 											<Command.Item
-												value={farm.id}
+												value={batch.id}
 												keywords={[
-													farm.name,
-													farm.code,
-													farm.type,
-													farm.barangay,
-													farm.municipality
+													batch.batchNumber,
+													g.farm.name,
+													g.farm.code,
+													g.farm.type,
+													batch.dateSet
 												]}
-												onSelect={() => select(farm.id)}
+												onSelect={() => select(batch.id)}
 												class="items-start gap-2 py-2"
 											>
 												<Check
 													class={cn(
 														'mt-0.5 size-4 shrink-0 text-red-700',
-														selectedId !== farm.id && 'text-transparent'
+														selectedBatchId !== batch.id && 'text-transparent'
 													)}
 												/>
 												<div class="flex min-w-0 flex-1 flex-col gap-0.5">
 													<div class="flex items-center gap-2">
-														<span class="truncate text-sm font-medium text-gray-900">
-															{farm.name}
+														<span class="truncate font-mono text-sm font-semibold text-gray-900">
+															{batch.batchNumber}
 														</span>
-														{@render typeBadge(farm.type)}
+														{@render typeBadge(g.farm.type)}
 													</div>
 													<div class="flex items-center gap-1.5 text-xs text-gray-500">
-														<span class="font-mono">{farm.code}</span>
+														<CalendarPlus class="size-3 shrink-0" />
+														<span>{formatDateShort(batch.dateSet)}</span>
 														<span aria-hidden="true">·</span>
-														<MapPin class="size-3 shrink-0" />
-														<span class="truncate">{toTitle(farm.barangay)}</span>
+														<span>{formatNumber(batch.volume)} chicks</span>
 													</div>
 												</div>
 											</Command.Item>
@@ -228,22 +224,24 @@
 					</Popover.Content>
 				</Popover.Root>
 
-				{#if selected}
-					<!-- ⬇ schedule now flows into the dialog -->
+				{#if selectedBatch && selectedFarm}
 					<PrintDialogCcs
-						volume={selected.volume}
+						volume={selectedBatch.volume}
 						columns={data.memory[group]}
-						farm={selected}
+						farm={selectedFarm}
+						batchId={selectedBatch.id}
+						batchNumber={selectedBatch.batchNumber}
+						batchDateSet={selectedBatch.dateSet}
 						{schedule}
 					/>
 				{/if}
 			</div>
 		</div>
 
-		<!-- FARM DETAILS -->
-		{#if selected}
+		<!-- BATCH + FARM DETAILS -->
+		{#if selectedBatch && selectedFarm}
 			<section
-				aria-labelledby="farm-details-title"
+				aria-labelledby="batch-details-title"
 				class="overflow-hidden rounded-lg border border-red-100 bg-white shadow-sm"
 			>
 				<!-- Header -->
@@ -251,37 +249,39 @@
 					class="flex items-center justify-between gap-2 border-b border-red-100 bg-gradient-to-r from-red-50 to-amber-50 px-3 py-2"
 				>
 					<div class="flex min-w-0 items-baseline gap-2">
-						<h2 id="farm-details-title" class="truncate text-sm font-bold text-gray-900">
-							{selected.name}
+						<h2 id="batch-details-title" class="truncate font-mono text-sm font-bold text-gray-900">
+							{selectedBatch.batchNumber}
 						</h2>
-						<span class="font-mono text-xs font-semibold text-red-700">{selected.code}</span>
-						{#if selected.type}
-							<span class="text-xs font-bold text-amber-600">{selected.type}</span>
+						<span class="truncate text-sm font-semibold text-gray-700">{selectedFarm.name}</span>
+						<span class="font-mono text-xs font-semibold text-red-700">{selectedFarm.code}</span>
+						{#if selectedFarm.type}
+							{@render typeBadge(selectedFarm.type)}
 						{/if}
 					</div>
 				</div>
 
 				<!-- Details -->
-				<dl class="grid grid-cols-2 gap-x-6 gap-y-2 px-3 py-2.5 sm:grid-cols-3 lg:grid-cols-6">
-					{@render infoItem(MapPin, 'Volume', formatNumber(selected.volume))}
-					{@render infoItem(MapIcon, 'Address', toTitle(selected.address))}
-					{@render infoItem(CalendarPlus, 'Created', formatDate(selected.createdAt))}
-					{@render infoItem(CalendarClock, 'Updated', formatDate(selected.updatedAt))}
+				<dl class="grid grid-cols-2 gap-x-6 gap-y-2 px-3 py-2.5 sm:grid-cols-3 lg:grid-cols-4">
+					{@render infoItem(Bird, 'Batch volume', `${formatNumber(selectedBatch.volume)} chicks`)}
+					{@render infoItem(CalendarPlus, 'Date set', formatDateShort(selectedBatch.dateSet))}
+					{@render infoItem(MapPin, 'Farm', `${selectedFarm.name} (${selectedFarm.code})`)}
+					{@render infoItem(MapIcon, 'Address', toTitle(selectedFarm.address))}
 				</dl>
 
 				<!-- Footer -->
 				<p class="truncate border-t border-amber-100 px-3 py-1 font-mono text-[10px] text-gray-400">
-					ID: {selected.id}
+					Batch ID: {selectedBatch.id} · Farm ID: {selectedFarm.id}
 				</p>
 			</section>
 
 			{#if group}
-				{#key selected.id}
+				{#key selectedBatch.id}
 					<div bind:this={pdfElement}>
 						<MedicationTable
-							volume={selected.volume}
+							volume={selectedBatch.volume}
 							columns={data.memory[group]}
 							onchange={(value) => (schedule = value)}
+							type={selectedFarm.type}
 						/>
 					</div>
 				{/key}
@@ -290,8 +290,8 @@
 			<p
 				class="rounded-lg border border-dashed border-amber-200 bg-amber-50/40 px-3 py-2 text-xs text-gray-600"
 			>
-				<span class="font-semibold text-gray-900">No farm selected.</span>
-				Choose a farm above to view its details.
+				<span class="font-semibold text-gray-900">No batch selected.</span>
+				Choose a chick batch above to generate its medication guide.
 			</p>
 		{/if}
 	</div>

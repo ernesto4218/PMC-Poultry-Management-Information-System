@@ -415,7 +415,7 @@
 									<Input
 										bind:this={batchSearchEl}
 										bind:value={batchSearch}
-										placeholder="Search batch # or farm…"
+										placeholder="Search Chick In No. or farm…"
 										class="h-9 rounded-md border-gray-300 pl-8 text-sm {inputCls}"
 										aria-label="Search batches"
 									/>

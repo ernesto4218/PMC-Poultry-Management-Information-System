@@ -69,9 +69,8 @@
 
 	// ---- Farm type styling ----------------------------------------------
 	const farmTypeStyles: Record<string, string> = {
-		'CON-MAH': 'bg-red-50 text-red-700 ring-red-200',
-		CCS: 'bg-blue-50 text-blue-700 ring-blue-200',
-		'CON-PAG': 'bg-amber-50 text-amber-800 ring-amber-200'
+		CON: 'bg-red-50 text-red-700 ring-red-200',
+		CCS: 'bg-blue-50 text-blue-700 ring-blue-200'
 	};
 	const fallbackTypeStyle = 'bg-gray-100 text-gray-600 ring-gray-200';
 	function typeBadgeClass(type: string) {
@@ -79,9 +78,8 @@
 	}
 
 	const farmTypeBarColors: Record<string, string> = {
-		'CON-MAH': 'bg-red-500',
-		CCS: 'bg-blue-500',
-		'CON-PAG': 'bg-amber-500'
+		CON: 'bg-red-500',
+		CCS: 'bg-blue-500'
 	};
 	function typeBarClass(type: string) {
 		return farmTypeBarColors[type] ?? 'bg-gray-400';

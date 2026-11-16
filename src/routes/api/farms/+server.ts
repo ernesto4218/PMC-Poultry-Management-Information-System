@@ -19,8 +19,11 @@ export const POST: RequestHandler = async ({ request }) => {
 	try {
 		const data: Farm = await request.json();
 
-		if (!data.name?.trim() || !data.code?.trim() || !data.type?.trim()) {
-			return json({ error: 'Missing required fields (name, code, type).' }, { status: 400 });
+		if (!data.name?.trim() || !data.code?.trim() || !data.type?.trim() || !data.volume) {
+			return json(
+				{ error: 'Missing required fields (name, code, type, volume).' },
+				{ status: 400 }
+			);
 		}
 
 		const savedFarm = await FarmService.createFarm(data);

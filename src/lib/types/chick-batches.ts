@@ -16,6 +16,7 @@ export interface ChickBatchWithFarm extends ChickBatch {
 		name: string;
 		code: string;
 		address: string;
+		type: string;
 	};
 }
 

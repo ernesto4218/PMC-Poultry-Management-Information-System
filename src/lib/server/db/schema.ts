@@ -12,6 +12,43 @@ import {
 	tinyint
 } from 'drizzle-orm/mysql-core';
 
+import type {
+	ChickBatchReportFilters,
+	ChickBatchReportSnapshotData
+} from '#lib/types/chick-batch-reports.ts';
+
+export type MedicationReportSnapshot = {
+	schemaVersion: 1 | 2;
+	farm: { id: string; name: string; code: string; type: string; address: string };
+	batch?: { id: string; number: string; dateSet: string } | null;
+	volume: number;
+	netVolume: number;
+	constants: { litersPerGallon: number; vacRatePerLiter: number; netFactor: number };
+	medications: Array<{
+		id: string;
+		name: string;
+		value: string | number;
+		unit: string;
+		ages?: string[];
+	}>;
+	days: Array<{
+		age: string;
+		waterOnly: boolean;
+		perBird: string;
+		gallons: number | null;
+		liters: number | null;
+		doses: Record<string, number>;
+	}>;
+	vaccination: Array<{
+		age: string;
+		gallons: number | null;
+		liters: number | null;
+		nbl: number | null;
+		gumboro: number | null;
+		vacSafe: number | null;
+	}>;
+};
+
 export const supplier_brands = mysqlTable(
 	'supplier_brands',
 	{
@@ -432,6 +469,48 @@ export const medication_memory = mysqlTable(
 		createdAt: timestamp('created_at').defaultNow().notNull()
 	},
 	(t) => [uniqueIndex('uq_memory_group_med').on(t.farmGroup, t.standardMedicineId)]
+);
+
+export const medication_report = mysqlTable(
+	'medication_report',
+	{
+		id: varchar('id', { length: 36 }).primaryKey(),
+		documentId: varchar('document_id', { length: 12 }).notNull(), // printed in the barcode
+		farmId: varchar('farm_id', { length: 36 })
+			.notNull()
+			.references(() => farm.id, { onDelete: 'restrict' }),
+		chickBatchId: varchar('chick_batch_id', { length: 36 }), // optional link if the report is per batch
+		// denormalized copies so the list page can search without parsing JSON
+		farmCode: varchar('farm_code', { length: 150 }).notNull(),
+		farmName: varchar('farm_name', { length: 150 }).notNull(),
+		volume: int('volume').notNull(),
+		contentHash: varchar('content_hash', { length: 64 }).notNull(),
+		snapshot: json('snapshot').$type<MedicationReportSnapshot>().notNull(),
+		status: varchar('status', { length: 20 }).notNull().default('active'), // 'active' | 'void'
+		createdBy: varchar('created_by', { length: 36 }),
+		createdAt: timestamp('created_at').defaultNow().notNull()
+	},
+	(t) => [
+		uniqueIndex('medication_report_document_id_unique').on(t.documentId),
+		index('medication_report_farm_created_idx').on(t.farmId, t.createdAt),
+		index('medication_report_farm_hash_idx').on(t.farmId, t.contentHash),
+		index('medication_report_created_idx').on(t.createdAt)
+	]
+);
+
+export const chickBatchReportSnapshot = mysqlTable(
+	'chick_batch_report_snapshot',
+	{
+		id: varchar('id', { length: 36 }).primaryKey(),
+		documentId: varchar('document_id', { length: 64 }).notNull().unique(),
+		filters: json('filters').$type<ChickBatchReportFilters>().notNull(),
+		snapshot: json('snapshot').$type<ChickBatchReportSnapshotData>().notNull(),
+		createdBy: varchar('created_by', { length: 36 }),
+		createdAt: timestamp('created_at').defaultNow().notNull(),
+		voidedAt: timestamp('voided_at'),
+		reprintCount: int('reprint_count').default(0).notNull()
+	},
+	(t) => [index('cbrs_created_at_idx').on(t.createdAt)]
 );
 
 export * from './auth.schema';

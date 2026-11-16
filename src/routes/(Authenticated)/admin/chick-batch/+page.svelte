@@ -30,10 +30,15 @@
 		ArrowDownIcon,
 		ChevronDownIcon,
 		CheckIcon,
-		BuildingIcon
+		BuildingIcon,
+		// NEW icons
+		SlidersHorizontalIcon,
+		FilterXIcon,
+		FileDownIcon
 	} from '@lucide/svelte';
 	import ChickBatchFormDialog from '#lib/components/chick-batch/ChickBatchFormDialog.svelte';
 	import DeleteChickBatchDialog from '#lib/components/chick-batch/DeleteChickBatchDialog.svelte';
+	import ChickBatchReportDialog from '#lib/components/chick-batch/ChickBatchReportDialog.svelte';
 
 	//@ts-ignore
 	let { data } = $props<{ data: { batches: ChickBatchWithFarm[]; farms: Farm[] } }>();
@@ -65,6 +70,85 @@
 	let farmSearch = $state('');
 	let farmPickerEl: HTMLDivElement;
 	let farmSearchEl: HTMLInputElement | undefined = $state();
+
+	let exportOpen = $state(false);
+
+	// ---- NEW: date preset filter ---------------------------------------
+	type DatePreset = 'all' | 'today' | 'week' | 'last30' | 'month' | 'year' | 'custom';
+	let datePreset = $state<DatePreset>('all');
+	let dateFrom = $state('');
+	let dateTo = $state('');
+
+	// ---- NEW: advanced filters -----------------------------------------
+	let volumeMin = $state('');
+	let volumeMax = $state('');
+	let farmTypeFilter = $state('all');
+	let showAdvanced = $state(false);
+
+	const datePresets: { value: DatePreset; label: string }[] = [
+		{ value: 'all', label: 'All time' },
+		{ value: 'today', label: 'Today' },
+		{ value: 'week', label: 'Last 7 days' },
+		{ value: 'last30', label: 'Last 30 days' },
+		{ value: 'month', label: 'This month' },
+		{ value: 'year', label: 'This year' },
+		{ value: 'custom', label: 'Custom' }
+	];
+
+	// Distinct farm types present in the dataset (for the type filter dropdown)
+	const farmTypes = $derived(
+		[...new Set(data.farms.map((f) => f.type).filter((t): t is string => Boolean(t)))].sort()
+	);
+
+	// Resolved date window from the preset (null = no filter)
+	const activeDateRange = $derived.by(() => {
+		const pad = (n: number) => String(n).padStart(2, '0');
+		const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+
+		switch (datePreset) {
+			case 'today':
+				return { from: ymd(today), to: ymd(today) };
+			case 'week': {
+				const d = new Date(today);
+				d.setDate(d.getDate() - 7);
+				return { from: ymd(d), to: ymd(today) };
+			}
+			case 'last30': {
+				const d = new Date(today);
+				d.setDate(d.getDate() - 30);
+				return { from: ymd(d), to: ymd(today) };
+			}
+			case 'month': {
+				const d = new Date(today.getFullYear(), today.getMonth(), 1);
+				return { from: ymd(d), to: ymd(today) };
+			}
+			case 'year': {
+				const d = new Date(today.getFullYear(), 0, 1);
+				return { from: ymd(d), to: ymd(today) };
+			}
+			case 'custom':
+				return dateFrom || dateTo ? { from: dateFrom, to: dateTo } : null;
+			default:
+				return null;
+		}
+	});
+
+	// Count of active advanced filters (for the badge on the Filters button)
+	const advancedCount = $derived(
+		(volumeMin ? 1 : 0) + (volumeMax ? 1 : 0) + (farmTypeFilter !== 'all' ? 1 : 0)
+	);
+
+	const exportFilters = $derived({
+		search: search.trim(),
+		farmId: farmFilter === 'all' ? null : farmFilter,
+		farmLabel:
+			farmFilter === 'all'
+				? 'All Farms'
+				: (data.farms.find((f) => f.id === farmFilter)?.name ?? 'All Farms'),
+		sort: sortValue
+	});
 
 	$effect(() => {
 		if (farmPickerOpen) {
@@ -112,7 +196,7 @@
 	}
 	// ---------------------------------------------------------------------
 
-	// ---- Live KPI totals ------------------------------------------------
+	// ---- Live KPI totals (across ALL rows, not filtered) ---------------
 	const totals = $derived.by(() => {
 		let chicks = 0;
 		const byFarm = new Map<
@@ -159,9 +243,12 @@
 		};
 	});
 
-	// ---- Filtering + sorting + pagination ------------------------------
+	// ---- Filtering + sorting + pagination (updated with new filters) ---
 	const filtered = $derived.by(() => {
 		const q = search.trim().toLowerCase();
+		const vMin = volumeMin ? Number(volumeMin) : null;
+		const vMax = volumeMax ? Number(volumeMax) : null;
+
 		const result = rows.filter((r) => {
 			const matchesSearch =
 				!q ||
@@ -169,8 +256,20 @@
 				r.farm.name.toLowerCase().includes(q) ||
 				r.farm.code.toLowerCase().includes(q) ||
 				r.farm.address.toLowerCase().includes(q);
+
 			const matchesFarm = farmFilter === 'all' || r.farmId === farmFilter;
-			return matchesSearch && matchesFarm;
+
+			const matchesDate =
+				!activeDateRange ||
+				((!activeDateRange.from || r.dateSet.slice(0, 10) >= activeDateRange.from) &&
+					(!activeDateRange.to || r.dateSet.slice(0, 10) <= activeDateRange.to));
+
+			const matchesVolume =
+				(vMin === null || r.volume >= vMin) && (vMax === null || r.volume <= vMax);
+
+			const matchesType = farmTypeFilter === 'all' || r.farm.type === farmTypeFilter;
+
+			return matchesSearch && matchesFarm && matchesDate && matchesVolume && matchesType;
 		});
 
 		result.sort((a, b) => {
@@ -190,15 +289,29 @@
 	const currentPage = $derived(Math.min(page, totalPages));
 	const paginated = $derived(filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize));
 
+	// Reset to page 1 whenever any filter changes
 	$effect(() => {
 		void search;
 		void farmFilter;
 		void pageSizeRaw;
 		void sortValue;
+		void datePreset;
+		void dateFrom;
+		void dateTo;
+		void volumeMin;
+		void volumeMax;
+		void farmTypeFilter;
 		page = 1;
 	});
 
-	const hasFilters = $derived(search.trim() !== '' || farmFilter !== 'all');
+	const hasFilters = $derived(
+		search.trim() !== '' ||
+			farmFilter !== 'all' ||
+			datePreset !== 'all' ||
+			volumeMin !== '' ||
+			volumeMax !== '' ||
+			farmTypeFilter !== 'all'
+	);
 
 	function toggleSort(key: SortKey) {
 		if (sortKey === key) {
@@ -262,7 +375,13 @@
 		const farm = data.farms.find((f) => f.id === saved.farmId)!;
 		const withFarm: ChickBatchWithFarm = {
 			...saved,
-			farm: { id: farm.id, name: farm.name, code: farm.code, address: farm.address }
+			farm: {
+				id: farm.id,
+				name: farm.name,
+				code: farm.code,
+				address: farm.address,
+				type: farm.type // NEW: required for farmTypeFilter to work on saved rows
+			}
 		};
 
 		rows = isEdit ? rows.map((r) => (r.id === saved.id ? withFarm : r)) : [withFarm, ...rows];
@@ -293,6 +412,18 @@
 	function clearFilters() {
 		search = '';
 		farmFilter = 'all';
+		datePreset = 'all';
+		dateFrom = '';
+		dateTo = '';
+		volumeMin = '';
+		volumeMax = '';
+		farmTypeFilter = 'all';
+	}
+
+	function resetAdvanced() {
+		volumeMin = '';
+		volumeMax = '';
+		farmTypeFilter = 'all';
 	}
 
 	async function copyBatchNumber(bn: string) {
@@ -402,6 +533,16 @@
 				</div>
 
 				<Button
+					variant="outline"
+					onclick={() => (exportOpen = true)}
+					disabled={rows.length === 0}
+					class="h-10 rounded-lg border-gray-300 px-4 font-semibold text-gray-700 hover:bg-stone-50 disabled:opacity-50"
+				>
+					<FileDownIcon class="mr-2 h-4 w-4" />
+					Export Report
+				</Button>
+
+				<Button
 					onclick={openAdd}
 					disabled={data.farms.length === 0}
 					class="h-10 rounded-lg bg-red-700 px-4 font-semibold text-white shadow-sm shadow-red-900/20 hover:bg-red-600 active:scale-[0.98] disabled:opacity-50"
@@ -501,163 +642,284 @@
 
 		<!-- CONTENT CARD -->
 		<div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-			<!-- Filter bar -->
-			<div
-				class="flex flex-col gap-3 border-b border-gray-100 p-4 lg:flex-row lg:items-center lg:justify-between"
-			>
-				<div class="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-					<!-- Search -->
-					<div class="relative w-full sm:max-w-xs">
-						<SearchIcon
-							class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400"
-						/>
-						<Input
-							bind:value={search}
-							placeholder="Search batch #, farm, or address…"
-							class="h-10 rounded-lg border-gray-300 pl-9 {inputCls}"
-							aria-label="Search batches"
-						/>
-					</div>
-
-					<!-- Searchable farm picker -->
-					<div class="relative w-full sm:w-[240px]" bind:this={farmPickerEl}>
-						<button
-							type="button"
-							onclick={toggleFarmPicker}
-							aria-haspopup="listbox"
-							aria-expanded={farmPickerOpen}
-							class="flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-gray-300 bg-white px-3 text-left text-sm shadow-xs transition-colors hover:bg-stone-50 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none"
-						>
-							<span class="flex min-w-0 flex-1 items-center gap-1.5">
-								{#if selectedFarmForFilter}
-									<BuildingIcon class="h-3.5 w-3.5 shrink-0 text-gray-400" />
-									<span class="truncate font-medium text-gray-900">
-										{selectedFarmForFilter.name}
-									</span>
-									<span class="shrink-0 font-mono text-[10px] text-gray-500">
-										{selectedFarmForFilter.code}
-									</span>
-								{:else}
-									<span class="text-gray-500">All farms</span>
-								{/if}
-							</span>
-							<ChevronDownIcon
-								class="h-4 w-4 shrink-0 text-gray-400 transition-transform {farmPickerOpen
-									? 'rotate-180'
-									: ''}"
+			<!-- Filter bar (EXTENDED) -->
+			<div class="space-y-3 border-b border-gray-100 p-4">
+				<!-- Row 1: primary filters -->
+				<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+					<div class="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+						<!-- Search -->
+						<div class="relative w-full sm:max-w-xs">
+							<SearchIcon
+								class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400"
 							/>
-						</button>
+							<Input
+								bind:value={search}
+								placeholder="Search Chick In No., farm, or address…"
+								class="h-10 rounded-lg border-gray-300 pl-9 {inputCls}"
+								aria-label="Search batches"
+							/>
+						</div>
 
-						{#if farmPickerOpen}
-							<div
-								class="absolute z-50 mt-1 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
+						<!-- Searchable farm picker -->
+						<div class="relative w-full sm:w-[240px]" bind:this={farmPickerEl}>
+							<button
+								type="button"
+								onclick={toggleFarmPicker}
+								aria-haspopup="listbox"
+								aria-expanded={farmPickerOpen}
+								class="flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-gray-300 bg-white px-3 text-left text-sm shadow-xs transition-colors hover:bg-stone-50 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none"
 							>
-								<div class="border-b border-gray-100 p-2">
-									<div class="relative">
-										<SearchIcon
-											class="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-gray-400"
-										/>
-										<Input
-											bind:this={farmSearchEl}
-											bind:value={farmSearch}
-											placeholder="Search name, code, or address…"
-											class="h-9 rounded-md border-gray-300 pl-8 text-sm {inputCls}"
-											aria-label="Search farms"
-										/>
-									</div>
-								</div>
+								<span class="flex min-w-0 flex-1 items-center gap-1.5">
+									{#if selectedFarmForFilter}
+										<BuildingIcon class="h-3.5 w-3.5 shrink-0 text-gray-400" />
+										<span class="truncate font-medium text-gray-900">
+											{selectedFarmForFilter.name}
+										</span>
+										<span class="shrink-0 font-mono text-[10px] text-gray-500">
+											{selectedFarmForFilter.code}
+										</span>
+									{:else}
+										<span class="text-gray-500">All farms</span>
+									{/if}
+								</span>
+								<ChevronDownIcon
+									class="h-4 w-4 shrink-0 text-gray-400 transition-transform {farmPickerOpen
+										? 'rotate-180'
+										: ''}"
+								/>
+							</button>
 
-								<ul class="max-h-60 overflow-y-auto py-1" role="listbox">
-									<li role="option" aria-selected={farmFilter === 'all'}>
-										<button
-											type="button"
-											onclick={() => selectFarmFilter('all')}
-											class="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors {farmFilter ===
-											'all'
-												? 'bg-amber-50'
-												: 'hover:bg-stone-50'}"
-										>
-											<span class="font-medium text-gray-900">All farms</span>
-											{#if farmFilter === 'all'}
-												<CheckIcon class="h-4 w-4 text-red-700" />
-											{/if}
-										</button>
-									</li>
-									{#each filteredFarmsForFilter as f (f.id)}
-										{@const isSelected = f.id === farmFilter}
-										<li role="option" aria-selected={isSelected}>
+							{#if farmPickerOpen}
+								<div
+									class="absolute z-50 mt-1 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
+								>
+									<div class="border-b border-gray-100 p-2">
+										<div class="relative">
+											<SearchIcon
+												class="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-gray-400"
+											/>
+											<Input
+												bind:this={farmSearchEl}
+												bind:value={farmSearch}
+												placeholder="Search name, code, or address…"
+												class="h-9 rounded-md border-gray-300 pl-8 text-sm {inputCls}"
+												aria-label="Search farms"
+											/>
+										</div>
+									</div>
+
+									<ul class="max-h-60 overflow-y-auto py-1" role="listbox">
+										<li role="option" aria-selected={farmFilter === 'all'}>
 											<button
 												type="button"
-												onclick={() => selectFarmFilter(f.id)}
-												class="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors {isSelected
+												onclick={() => selectFarmFilter('all')}
+												class="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors {farmFilter ===
+												'all'
 													? 'bg-amber-50'
 													: 'hover:bg-stone-50'}"
 											>
-												<div class="flex min-w-0 flex-1 flex-col">
-													<span class="truncate text-sm font-medium text-gray-900">
-														{f.name}
-													</span>
-													<span class="truncate text-xs text-gray-500">
-														{f.address || '—'}
-													</span>
-												</div>
-												<span
-													class="shrink-0 rounded bg-stone-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-gray-600"
-												>
-													{f.code}
-												</span>
-												{#if isSelected}
-													<CheckIcon class="h-4 w-4 shrink-0 text-red-700" />
+												<span class="font-medium text-gray-900">All farms</span>
+												{#if farmFilter === 'all'}
+													<CheckIcon class="h-4 w-4 text-red-700" />
 												{/if}
 											</button>
 										</li>
+										{#each filteredFarmsForFilter as f (f.id)}
+											{@const isSelected = f.id === farmFilter}
+											<li role="option" aria-selected={isSelected}>
+												<button
+													type="button"
+													onclick={() => selectFarmFilter(f.id)}
+													class="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors {isSelected
+														? 'bg-amber-50'
+														: 'hover:bg-stone-50'}"
+												>
+													<div class="flex min-w-0 flex-1 flex-col">
+														<span class="truncate text-sm font-medium text-gray-900">
+															{f.name}
+														</span>
+														<span class="truncate text-xs text-gray-500">
+															{f.address || '—'}
+														</span>
+													</div>
+													<span
+														class="shrink-0 rounded bg-stone-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-gray-600"
+													>
+														{f.code}
+													</span>
+													{#if isSelected}
+														<CheckIcon class="h-4 w-4 shrink-0 text-red-700" />
+													{/if}
+												</button>
+											</li>
+										{:else}
+											<li class="px-3 py-6 text-center text-sm text-gray-500">
+												{#if farmSearch.trim()}
+													No farms match "{farmSearch.trim()}"
+												{:else}
+													No farms available
+												{/if}
+											</li>
+										{/each}
+									</ul>
+								</div>
+							{/if}
+						</div>
+
+						<!-- Sort -->
+						<Select.Root type="single" bind:value={sortValue}>
+							<Select.Trigger
+								class="h-10 w-full rounded-lg border-gray-300 text-sm sm:w-[180px]"
+								aria-label="Sort order"
+							>
+								<span class="flex items-center gap-1.5">
+									{#if sortDir === 'asc'}
+										<ArrowUpIcon class="h-3.5 w-3.5 text-gray-500" />
 									{:else}
-										<li class="px-3 py-6 text-center text-sm text-gray-500">
-											{#if farmSearch.trim()}
-												No farms match "{farmSearch.trim()}"
-											{:else}
-												No farms available
-											{/if}
-										</li>
-									{/each}
-								</ul>
-							</div>
-						{/if}
+										<ArrowDownIcon class="h-3.5 w-3.5 text-gray-500" />
+									{/if}
+									{sortLabel(sortValue)}
+								</span>
+							</Select.Trigger>
+							<Select.Content>
+								<Select.Item value="date-desc">Newest first</Select.Item>
+								<Select.Item value="date-asc">Oldest first</Select.Item>
+								<Select.Item value="volume-desc">Largest first</Select.Item>
+								<Select.Item value="volume-asc">Smallest first</Select.Item>
+							</Select.Content>
+						</Select.Root>
+
+						<!-- NEW: Advanced filters toggle -->
+						<button
+							type="button"
+							onclick={() => (showAdvanced = !showAdvanced)}
+							class="flex h-10 items-center gap-1.5 rounded-lg border bg-white px-3 text-sm font-semibold transition-colors {showAdvanced
+								? 'border-red-200 bg-red-50 text-red-700'
+								: 'border-gray-300 text-gray-700 hover:bg-stone-50'}"
+							aria-expanded={showAdvanced}
+						>
+							<SlidersHorizontalIcon class="h-3.5 w-3.5" />
+							Filters
+							{#if advancedCount > 0}
+								<span
+									class="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white"
+								>
+									{advancedCount}
+								</span>
+							{/if}
+						</button>
 					</div>
 
-					<!-- Sort -->
-					<Select.Root type="single" bind:value={sortValue}>
-						<Select.Trigger
-							class="h-10 w-full rounded-lg border-gray-300 text-sm sm:w-[180px]"
-							aria-label="Sort order"
+					{#if hasFilters}
+						<Button
+							variant="ghost"
+							class="h-10 shrink-0 text-gray-600 hover:text-red-700"
+							onclick={clearFilters}
 						>
-							<span class="flex items-center gap-1.5">
-								{#if sortDir === 'asc'}
-									<ArrowUpIcon class="h-3.5 w-3.5 text-gray-500" />
-								{:else}
-									<ArrowDownIcon class="h-3.5 w-3.5 text-gray-500" />
-								{/if}
-								{sortLabel(sortValue)}
-							</span>
-						</Select.Trigger>
-						<Select.Content>
-							<Select.Item value="date-desc">Newest first</Select.Item>
-							<Select.Item value="date-asc">Oldest first</Select.Item>
-							<Select.Item value="volume-desc">Largest first</Select.Item>
-							<Select.Item value="volume-asc">Smallest first</Select.Item>
-						</Select.Content>
-					</Select.Root>
+							<FilterXIcon class="mr-1 h-4 w-4" />
+							Clear filters
+						</Button>
+					{/if}
 				</div>
 
-				{#if hasFilters}
-					<Button
-						variant="ghost"
-						class="h-10 shrink-0 text-gray-600 hover:text-red-700"
-						onclick={clearFilters}
-					>
-						<XIcon class="mr-1 h-4 w-4" />
-						Clear
-					</Button>
+				<!-- NEW: Row 2 — date presets -->
+				<div class="flex flex-wrap items-center gap-1.5">
+					<span class="mr-1 text-[11px] font-semibold tracking-wider text-gray-400 uppercase">
+						Date
+					</span>
+					{#each datePresets as p (p.value)}
+						<button
+							type="button"
+							onclick={() => (datePreset = p.value)}
+							class="rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors {datePreset ===
+							p.value
+								? 'border-red-200 bg-red-50 text-red-700'
+								: 'border-gray-200 bg-white text-gray-600 hover:bg-stone-50'}"
+						>
+							{p.label}
+						</button>
+					{/each}
+
+					{#if datePreset === 'custom'}
+						<div class="ml-1 flex items-center gap-1.5">
+							<Input
+								type="date"
+								bind:value={dateFrom}
+								class="h-8 w-[145px] rounded-md border-gray-300 text-xs {inputCls}"
+								aria-label="From date"
+							/>
+							<span class="text-xs text-gray-400">to</span>
+							<Input
+								type="date"
+								bind:value={dateTo}
+								class="h-8 w-[145px] rounded-md border-gray-300 text-xs {inputCls}"
+								aria-label="To date"
+							/>
+						</div>
+					{/if}
+				</div>
+
+				<!-- NEW: Row 3 — advanced filters -->
+				{#if showAdvanced}
+					<div class="flex flex-wrap items-center gap-3 border-t border-gray-100 pt-3">
+						<!-- Volume range -->
+						<div class="flex items-center gap-1.5">
+							<span class="text-[11px] font-semibold tracking-wider text-gray-400 uppercase">
+								Volume
+							</span>
+							<Input
+								type="number"
+								min="0"
+								bind:value={volumeMin}
+								placeholder="Min"
+								class="h-8 w-[90px] rounded-md border-gray-300 text-xs {inputCls}"
+								aria-label="Minimum volume"
+							/>
+							<span class="text-xs text-gray-400">–</span>
+							<Input
+								type="number"
+								min="0"
+								bind:value={volumeMax}
+								placeholder="Max"
+								class="h-8 w-[90px] rounded-md border-gray-300 text-xs {inputCls}"
+								aria-label="Maximum volume"
+							/>
+						</div>
+
+						<!-- Farm type -->
+						{#if farmTypes.length > 0}
+							<div class="flex items-center gap-1.5">
+								<span class="text-[11px] font-semibold tracking-wider text-gray-400 uppercase">
+									Farm type
+								</span>
+								<Select.Root type="single" bind:value={farmTypeFilter}>
+									<Select.Trigger
+										class="h-8 w-[130px] rounded-md border-gray-300 text-xs"
+										aria-label="Farm type"
+									>
+										{farmTypeFilter === 'all' ? 'All types' : farmTypeFilter}
+									</Select.Trigger>
+									<Select.Content>
+										<Select.Item value="all">All types</Select.Item>
+										{#each farmTypes as t (t)}
+											<Select.Item value={t}>{t}</Select.Item>
+										{/each}
+									</Select.Content>
+								</Select.Root>
+							</div>
+						{/if}
+
+						{#if advancedCount > 0}
+							<button
+								type="button"
+								onclick={resetAdvanced}
+								class="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-red-700"
+							>
+								<XIcon class="h-3 w-3" />
+								Reset advanced
+							</button>
+						{/if}
+					</div>
 				{/if}
 			</div>
 
@@ -666,7 +928,7 @@
 				<Table.Root>
 					<Table.Header class="bg-stone-50">
 						<Table.Row class="hover:bg-transparent">
-							<Table.Head class={thCls}>Batch #</Table.Head>
+							<Table.Head class={thCls}>Chick In No.</Table.Head>
 							<Table.Head class={thCls}>Farm</Table.Head>
 							<Table.Head class={thCls}>
 								<button
@@ -1023,3 +1285,5 @@
 	onsave={handleSave}
 />
 <DeleteChickBatchDialog bind:open={deleteOpen} batch={deleteTarget} onconfirm={confirmDelete} />
+
+<ChickBatchReportDialog bind:open={exportOpen} batches={filtered} filters={exportFilters} />

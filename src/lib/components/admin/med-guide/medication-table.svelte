@@ -6,15 +6,14 @@
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import MedicationSummary from './medication-summary.svelte';
 	import { Syringe } from '@lucide/svelte';
+	import { buildVaccination, LITERS_PER_GALLON } from '#lib/medication/medication.ts';
 
 	/**
 	 * columns:  MemoryColumn[] for the selected farm group
 	 * volume:   farm volume used for the water calculation
 	 * onchange: called with a plain-data snapshot whenever anything changes
 	 */
-	let { columns = [], volume = 0, onchange } = $props();
-
-	const LITERS_PER_GALLON = 3.8;
+	let { columns = [], volume = 0, onchange, type } = $props();
 
 	// Water needed per bird, by age. Day 6 is water only: no value.
 	const WATER_PER_BIRD = {
@@ -55,16 +54,20 @@
 
 	// '0-1', '2', '3' ... '34'
 	const AGES = ['0-1', ...Array.from({ length: 33 }, (_, i) => String(i + 2))];
+	const DEFAULT_GALLONS = {
+		'10': '150',
+		'11': '240',
+		'12': '240',
+		'14': '9'
+	};
 
 	let days = $state(
 		AGES.map((age) => ({
 			age,
 			waterOnly: age === '6',
 			perBird: WATER_PER_BIRD[age] != null ? String(WATER_PER_BIRD[age]) : '',
-			// Empty → derive gallons from `perBird × volume / 1000`.
-			// Non-empty → user typed a gallons value; it becomes the source of truth
-			// for that row and liters/doses follow it.
-			manualGallons: ''
+			// Seed with the default gallons when one exists; empty means "derive from perBird × volume".
+			manualGallons: DEFAULT_GALLONS[age] ?? ''
 		}))
 	);
 
@@ -138,22 +141,24 @@
 		}))
 	});
 
+	const vaccination = $derived(
+		buildVaccination(
+			days.map((d) => d.age),
+			Number(volume),
+			type
+		)
+	);
+
 	$effect(() => {
 		onchange?.(
 			$state.snapshot({
 				medications: columns,
 				volume,
-				days: schedule.days
+				days: schedule.days,
+				vaccination
 			})
 		);
 	});
-
-	const VAC_RATE_PER_LITER = 8.5;
-	const NET_LITERS = $derived(volume / 1000);
-	const VAC_WATER_AMOUNT = $derived(NET_LITERS * VAC_RATE_PER_LITER);
-	const VAC_WATER_AMOUNT_L = $derived(VAC_WATER_AMOUNT * 3.8);
-	const NBL_10 = $derived(volume / 1000);
-	const VAC_SAFE = $derived(Math.round(VAC_WATER_AMOUNT_L / 100));
 
 	const cellInput =
 		'h-7 rounded-none border-0 bg-transparent px-2 text-right text-xs tabular-nums shadow-none md:text-xs focus-visible:bg-amber-50 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-red-400';
@@ -172,6 +177,17 @@
 		// Empty string → revert this row to perBird-derived gallons.
 		day.manualGallons = cleaned;
 	}
+
+	$effect(() => {
+		onchange?.(
+			$state.snapshot({
+				medications: columns,
+				volume,
+				days: schedule.days,
+				vaccination
+			})
+		);
+	});
 </script>
 
 <div class="flex flex-col gap-3">
@@ -371,11 +387,6 @@
 							>
 								L
 							</Table.Head>
-							<Table.Head
-								class="sticky top-0 z-20 h-9 w-15 border-r border-b border-gray-300 bg-amber-50 px-2 text-center text-xs font-bold text-gray-900"
-							>
-								NBL
-							</Table.Head>
 
 							<Table.Head
 								class="sticky top-0 z-20 h-9 w-15 border-r border-b border-gray-300 bg-amber-50 px-2 text-center text-xs font-bold text-gray-900"
@@ -396,42 +407,29 @@
 					</Table.Header>
 
 					<Table.Body>
-						{#each days as day, index (day.age)}
+						{#each vaccination as row (row.age)}
 							<Table.Row class="border-0 hover:bg-transparent">
 								<Table.Cell
 									class="sticky left-0 z-10 border-r border-b border-gray-200 bg-amber-50 p-0"
 								>
-									<button
-										type="button"
-										class="h-7 w-full px-2 text-center text-xs font-bold text-gray-900 transition hover:bg-amber-100 focus-visible:ring-1 focus-visible:ring-red-400 focus-visible:outline-none focus-visible:ring-inset"
-										title={day.waterOnly ? 'Mark as medicated day' : 'Mark as water only'}
-										aria-pressed={day.waterOnly}
-									>
-										{day.age}
-									</button>
-								</Table.Cell>
-
-								<Table.Cell class="border-r border-b border-gray-200 p-0 text-center">
-									{#if index === 9 || index === 13}
-										{VAC_WATER_AMOUNT}
-									{/if}
+									<div class="flex h-7 items-center justify-center text-xs font-bold text-gray-900">
+										{row.age}
+									</div>
 								</Table.Cell>
 								<Table.Cell class="border-r border-b border-gray-200 p-0 text-center">
-									{#if index === 9 || index === 13}
-										{VAC_WATER_AMOUNT_L}
-									{/if}
+									{fmt(row.gallons)}
 								</Table.Cell>
-								<Table.Cell class="border-r border-b border-gray-200 p-0 text-center"></Table.Cell>
 								<Table.Cell class="border-r border-b border-gray-200 p-0 text-center">
-									{#if index === 9}
-										{NBL_10}
-									{/if}
+									{fmt(row.liters)}
 								</Table.Cell>
-								<Table.Cell class="border-r border-b border-gray-200 p-0 text-center"></Table.Cell>
 								<Table.Cell class="border-r border-b border-gray-200 p-0 text-center">
-									{#if index === 9 || index === 13}
-										{VAC_SAFE}
-									{/if}
+									{fmt(row.nbl)}
+								</Table.Cell>
+								<Table.Cell class="border-r border-b border-gray-200 p-0 text-center">
+									{fmt(row.gumboro)}
+								</Table.Cell>
+								<Table.Cell class="border-r border-b border-gray-200 p-0 text-center">
+									{fmt(row.vacSafe)}
 								</Table.Cell>
 							</Table.Row>
 						{/each}

@@ -1,7 +1,7 @@
 // Place at: src/lib/server/services/farms.services.ts
 import { db } from '#lib/server/db/index.ts';
 import { farm } from '#lib/server/db/schema.ts';
-import { eq, or, sql } from 'drizzle-orm';
+import { eq, or, sql, like } from 'drizzle-orm';
 import type { Farm } from '#lib/types/farms.ts';
 import { ChickBatchService } from './chick-batches.services';
 
@@ -17,6 +17,11 @@ export class FarmService {
 			.select()
 			.from(farm)
 			.where(opts.type ? eq(farm.type, opts.type) : undefined);
+		return results;
+	}
+
+	static async getAllFarmsCON(opts: { type?: string } = {}): Promise<Farm[]> {
+		const results = await db.select().from(farm).where(like(farm.type, '%CON%'));
 		return results;
 	}
 
@@ -57,6 +62,7 @@ export class FarmService {
 			name: data.name.trim(),
 			type: data.type.trim(),
 			code: data.code.trim(),
+			volume: data.volume,
 			address: data.address.trim()
 		});
 
@@ -80,6 +86,7 @@ export class FarmService {
 				name: data.name.trim(),
 				type: data.type.trim(),
 				code: data.code.trim(),
+				volume: data.volume,
 				address: data.address.trim(),
 				updatedAt: new Date()
 			})
