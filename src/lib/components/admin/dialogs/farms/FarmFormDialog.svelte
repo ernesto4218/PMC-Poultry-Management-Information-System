@@ -12,11 +12,13 @@
 		open = $bindable(false),
 		farm = null,
 		farms,
+		memories,
 		onsave
 	}: {
 		open?: boolean;
 		farm?: Farm | null;
 		farms: Farm[];
+		memories: { id: string; name: string }[];
 		/** May be async. Throw an Error to keep the dialog open and show its message. */
 		onsave: (farm: Farm) => void | Promise<void>;
 	} = $props();
@@ -36,6 +38,10 @@
 
 	const others = $derived(farms.filter((f) => f.id !== farm?.id));
 
+	const selectedMemoryName = $derived(
+		memories.find((m) => m.id === form.particularsMemoryId)?.name
+	);
+
 	const duplicateName = $derived(
 		form.name.trim() !== '' &&
 			others.some((f) => f.name.toLowerCase() === form.name.trim().toLowerCase())
@@ -50,6 +56,8 @@
 			form.code.trim() !== '' &&
 			Number.isFinite(form.volume) &&
 			form.volume > 0 &&
+			Number.isInteger(form.staff) &&
+			form.staff >= 0 &&
 			!duplicateName &&
 			!duplicateCode
 	);
@@ -67,7 +75,8 @@
 				...form,
 				name: form.name.trim(),
 				code: form.code.trim(),
-				address: form.address.trim()
+				address: form.address.trim(),
+				particularsMemoryId: form.particularsMemoryId || null
 			});
 			open = false;
 		} catch (err) {
@@ -131,7 +140,7 @@
 			</div>
 
 			<div class="space-y-2">
-				<Label for="feedType">Type <span class="text-red-600">*</span></Label>
+				<Label for="type">Type <span class="text-red-600">*</span></Label>
 				<Select.Root type="single" bind:value={form.type}>
 					<Select.Trigger id="type" class="w-full">
 						{form.type || 'Select farm type'}
@@ -156,6 +165,36 @@
 					required
 					class={inputCls}
 				/>
+			</div>
+
+			<div class="space-y-2">
+				<Label for="staff">Staff <span class="text-red-600">*</span></Label>
+				<Input
+					id="staff"
+					type="number"
+					min="0"
+					step="1"
+					bind:value={form.staff}
+					placeholder="e.g. 5"
+					required
+					class={inputCls}
+				/>
+				<p class="text-xs text-gray-500">Number of staff assigned to this farm.</p>
+			</div>
+
+			<div class="space-y-2">
+				<Label for="memory">Particulars memory</Label>
+				<Select.Root type="single" bind:value={form.particularsMemoryId}>
+					<Select.Trigger id="memory" class="w-full">
+						{selectedMemoryName ?? 'No memory'}
+					</Select.Trigger>
+					<Select.Content>
+						<Select.Item value="">No memory</Select.Item>
+						{#each memories as m (m.id)}
+							<Select.Item value={m.id}>{m.name}</Select.Item>
+						{/each}
+					</Select.Content>
+				</Select.Root>
 			</div>
 
 			<div class="space-y-2">

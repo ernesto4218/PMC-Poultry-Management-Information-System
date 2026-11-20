@@ -1,0 +1,1 @@
+ALTER TABLE `particulars` ADD `category` varchar(150) NOT NULL;

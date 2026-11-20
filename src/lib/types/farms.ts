@@ -4,7 +4,9 @@ export interface Farm {
 	code: string; // Farm code
 	address: string; // Address
 	type: string;
+	staff: number;
 	volume: number; // Volume
+	particularsMemoryId: string | null;
 }
 
 export const farmTypes = ['CON', 'CCS'];
@@ -16,7 +18,9 @@ export const emptyFarmForm = (): FarmForm => ({
 	code: '',
 	address: '',
 	type: '',
-	volume: 0
+	volume: 0,
+	staff: 0,
+	particularsMemoryId: ''
 });
 
 export const farmToForm = (farm: Farm): FarmForm => {

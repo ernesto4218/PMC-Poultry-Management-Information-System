@@ -28,7 +28,8 @@
 		Birdhouse,
 		MemoryStickIcon,
 		ListOrdered,
-		CpuIcon
+		CpuIcon,
+		Pill
 	} from '@lucide/svelte';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
@@ -86,6 +87,7 @@
 					url: '/admin/med-guide',
 					icon: BookCopy,
 					children: [
+						{ title: 'Medicine', url: '/admin/med-guide/medicine', icon: Pill },
 						{ title: 'CCS', url: '/admin/med-guide/ccs', icon: SquareBookmark },
 						{ title: 'CON', url: '/admin/med-guide/con', icon: SquareBookmark },
 						{ title: 'Memory', url: '/admin/med-guide/memory', icon: MemoryStickIcon },
@@ -98,12 +100,7 @@
 					icon: Wallet,
 					children: [
 						{ title: 'Particulars', url: '/admin/budget-placement/particulars', icon: ListOrdered },
-						{ title: 'Memory', url: '/admin/budget-placement/memory', icon: MemoryStickIcon },
-						{
-							title: 'Configurations',
-							url: '/admin/budget-placement/configuraion',
-							icon: Settings
-						},
+						{ title: 'Memory', url: '/admin/budget-placement/memories', icon: MemoryStickIcon },
 						{ title: 'Generator', url: '/admin/budget-placement/generator', icon: CpuIcon },
 						{ title: 'Reports', url: '/admin/budget-placement/reports', icon: Newspaper }
 					]

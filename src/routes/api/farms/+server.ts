@@ -19,6 +19,10 @@ export const POST: RequestHandler = async ({ request }) => {
 	try {
 		const data: Farm = await request.json();
 
+		if (!Number.isInteger(data.staff) || data.staff < 0) {
+			return json({ error: 'Staff must be a whole number of 0 or more.' }, { status: 400 });
+		}
+
 		if (!data.name?.trim() || !data.code?.trim() || !data.type?.trim() || !data.volume) {
 			return json(
 				{ error: 'Missing required fields (name, code, type, volume).' },
@@ -37,6 +41,10 @@ export const POST: RequestHandler = async ({ request }) => {
 export const PUT: RequestHandler = async ({ request }) => {
 	try {
 		const data: Farm = await request.json();
+
+		if (!Number.isInteger(data.staff) || data.staff < 0) {
+			return json({ error: 'Staff must be a whole number of 0 or more.' }, { status: 400 });
+		}
 
 		if (!data.id || !data.name?.trim() || !data.code?.trim() || !data.type?.trim()) {
 			return json({ error: 'Missing required farm identification or fields.' }, { status: 400 });

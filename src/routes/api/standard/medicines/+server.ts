@@ -29,6 +29,7 @@ export const POST: RequestHandler = async ({ request }) => {
 export const PUT: RequestHandler = async ({ request }) => {
 	try {
 		const body = await request.json();
+		console.log('update body: ', body);
 		return json(await StandardMedicineService.update(body));
 	} catch (err) {
 		return fail(err);

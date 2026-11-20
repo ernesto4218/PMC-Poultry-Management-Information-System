@@ -41,6 +41,7 @@
 	let { data } = $props<{
 		data: {
 			farms: Farm[];
+			memories: { id: string; name: string }[];
 			farmStats: Record<string, FarmStat>;
 			totals: { farms: number; batches: number; chicks: number };
 		};
@@ -66,6 +67,11 @@
 	let editingFarm = $state<Farm | null>(null);
 	let deleteOpen = $state(false);
 	let deleteTarget = $state<Farm | null>(null);
+
+	// ---- Memory lookup ---------------------------------------------------
+	const memoryNameById = $derived(
+		new Map<string, string>((data.memories ?? []).map((m) => [m.id, m.name]))
+	);
 
 	// ---- Farm type styling ----------------------------------------------
 	const farmTypeStyles: Record<string, string> = {
@@ -682,6 +688,7 @@
 									{@render sortIcon('type')}
 								</button>
 							</Table.Head>
+							<Table.Head class="{thCls} hidden lg:table-cell">Staff</Table.Head>
 							<Table.Head class="{thCls} hidden md:table-cell">
 								<button
 									type="button"
@@ -750,6 +757,14 @@
 										{/if}
 									</div>
 								</Table.Cell>
+								<Table.Cell class="hidden text-sm font-medium text-gray-700 lg:table-cell">
+									{row.staff ?? 0}
+									{#if row.particularsMemoryId}
+										<span class="mt-1 block text-xs font-normal text-gray-500">
+											{memoryNameById.get(row.particularsMemoryId) ?? '—'}
+										</span>
+									{/if}
+								</Table.Cell>
 								<Table.Cell class="hidden md:table-cell">
 									<span
 										class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800"
@@ -794,7 +809,7 @@
 							</Table.Row>
 						{:else}
 							<Table.Row class="hover:bg-transparent">
-								<Table.Cell colspan={6} class="py-16">
+								<Table.Cell colspan={7} class="py-16">
 									<div class="mx-auto flex max-w-sm flex-col items-center text-center">
 										<div
 											class="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-amber-600"
@@ -877,6 +892,12 @@
 													<span class="truncate">{farm.address}</span>
 												</p>
 											{/if}
+											<p class="mt-1 text-xs text-gray-500">
+												{farm.staff ?? 0} staff
+												{#if farm.particularsMemoryId}
+													· {memoryNameById.get(farm.particularsMemoryId) ?? '—'}
+												{/if}
+											</p>
 										</div>
 										<div class="flex gap-0.5 opacity-60 transition-opacity group-hover:opacity-100">
 											<Button
@@ -1003,5 +1024,11 @@
 	</div>
 </div>
 
-<FarmFormDialog bind:open={formOpen} farm={editingFarm} farms={rows} onsave={handleSave} />
+<FarmFormDialog
+	bind:open={formOpen}
+	farm={editingFarm}
+	memories={data.memory ?? []}
+	farms={rows}
+	onsave={handleSave}
+/>
 <DeleteFarmDialog bind:open={deleteOpen} farm={deleteTarget} onconfirm={confirmDelete} />

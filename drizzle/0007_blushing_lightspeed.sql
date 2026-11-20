@@ -1,0 +1,1 @@
+ALTER TABLE `farm` ADD `staff` int DEFAULT 0 NOT NULL;

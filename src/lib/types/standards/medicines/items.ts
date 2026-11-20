@@ -5,6 +5,7 @@ export type Item = {
 	id: string;
 	itemName: string;
 	areaName: string;
+	price: number;
 	// farmType removed
 	value: number;
 	unit: MedicineUnit;

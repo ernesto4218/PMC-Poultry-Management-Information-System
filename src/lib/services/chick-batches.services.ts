@@ -68,7 +68,8 @@ export class ChickBatchService {
 				farmName: farm.name,
 				farmCode: farm.code,
 				farmAddress: farm.address,
-				farmType: farm.type
+				farmType: farm.type,
+				farmParticular: farm.particularsMemoryId
 			})
 			.from(chickBatch)
 			.innerJoin(farm, eq(chickBatch.farmId, farm.id))
@@ -87,7 +88,45 @@ export class ChickBatchService {
 				name: r.farmName,
 				code: r.farmCode,
 				address: r.farmAddress,
-				type: r.farmType
+				type: r.farmType,
+				particular_id: r.farmParticular
+			}
+		}));
+	}
+
+	static async getAllBatchesByFarm(): Promise<ChickBatchWithFarm[]> {
+		const rows = await db
+			.select({
+				id: chickBatch.id,
+				farmId: chickBatch.farmId,
+				batchNumber: chickBatch.batchNumber,
+				dateSet: chickBatch.dateSet,
+				volume: chickBatch.volume,
+				sequence: chickBatch.sequence,
+				farmName: farm.name,
+				farmCode: farm.code,
+				farmAddress: farm.address,
+				farmType: farm.type,
+				farmParticular: farm.particularsMemoryId
+			})
+			.from(chickBatch)
+			.innerJoin(farm, eq(chickBatch.farmId, farm.id))
+			.orderBy(desc(chickBatch.dateSet), desc(chickBatch.createdAt));
+
+		return rows.map((r) => ({
+			id: r.id,
+			farmId: r.farmId,
+			batchNumber: r.batchNumber,
+			dateSet: toDateOnly(r.dateSet),
+			volume: r.volume,
+			sequence: r.sequence,
+			farm: {
+				id: r.farmId,
+				name: r.farmName,
+				code: r.farmCode,
+				address: r.farmAddress,
+				type: r.farmType,
+				particular_id: r.farmParticular // <-- add this
 			}
 		}));
 	}

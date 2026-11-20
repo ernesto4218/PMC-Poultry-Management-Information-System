@@ -1,51 +1,40 @@
 import { particulars } from '#lib/server/db/schema.ts';
 import { eq, desc } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
-import type { Particular, ParticularInput } from '#lib/types/particulars.ts';
+import {
+	PARTICULAR_CATEGORIES,
+	type Particular,
+	type ParticularInput,
+	type ParticularCategory
+} from '#lib/types/particulars.ts';
 import { db } from '../server/db';
+import { StandardMedicineService } from './standardsmedicine.services';
 
 type Row = typeof particulars.$inferSelect;
-
-const MAX_ADJUST_DAYS = 36500; // ±100 years; guards against absurd input
 
 function rowToItem(row: Row): Particular {
 	return {
 		id: row.id,
 		name: row.name,
-		qty: row.qty,
-		price: Number(row.price),
-		adjustmentDays: row.adjustmentDays ?? null,
+		category: row.category,
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString()
 	};
 }
 
-function normalise(input: {
-	name?: string;
-	qty?: number | string;
-	price?: number | string;
-	adjustmentDays?: number | string | null;
-}) {
-	const name = String(input.name ?? '').trim();
-	const qty = Number(input.qty);
-	const price = Number(input.price);
+function normaliseName(name: unknown): string {
+	const n = String(name ?? '').trim();
+	if (!n) throw new Error('Name is required.');
+	if (n.length > 150) throw new Error('Name is too long (max 150 chars).');
+	return n;
+}
 
-	const rawAdj = input.adjustmentDays;
-	const adjustmentDays =
-		rawAdj === null || rawAdj === undefined || String(rawAdj).trim() === '' ? null : Number(rawAdj);
-
-	if (!name) throw new Error('Name is required.');
-	if (!Number.isInteger(qty) || qty < 0)
-		throw new Error('QTY must be a non-negative whole number.');
-	if (!Number.isFinite(price) || price < 0) throw new Error('Price must be a non-negative number.');
-	if (
-		adjustmentDays !== null &&
-		(!Number.isInteger(adjustmentDays) || Math.abs(adjustmentDays) > MAX_ADJUST_DAYS)
-	) {
-		throw new Error(`Adjustment days must be a whole number within ±${MAX_ADJUST_DAYS}.`);
+function normaliseCategory(category: unknown): ParticularCategory {
+	const c = String(category ?? '').trim();
+	if (!(PARTICULAR_CATEGORIES as readonly string[]).includes(c)) {
+		throw new Error('Invalid category.');
 	}
-
-	return { name, qty, price, adjustmentDays };
+	return c as ParticularCategory;
 }
 
 export class ParticularsService {
@@ -59,17 +48,23 @@ export class ParticularsService {
 		return row ? rowToItem(row) : null;
 	}
 
-	static async create(input: ParticularInput): Promise<Particular> {
-		const { name, qty, price, adjustmentDays } = normalise(input);
-		const id = input.id ?? randomUUID();
+	private static async assertUnique(name: string, excludeId?: string) {
+		const [existing] = await db
+			.select()
+			.from(particulars)
+			.where(eq(particulars.name, name))
+			.limit(1);
+		if (existing && existing.id !== excludeId) {
+			throw new Error('A particular with this name already exists.');
+		}
+	}
 
-		await db.insert(particulars).values({
-			id,
-			name,
-			qty,
-			price: price.toFixed(2),
-			adjustmentDays
-		});
+	static async create(input: ParticularInput): Promise<Particular> {
+		const name = normaliseName(input.name);
+		const category = normaliseCategory(input.category);
+		await this.assertUnique(name);
+		const id = input.id ?? randomUUID();
+		await db.insert(particulars).values({ id, name, category });
 
 		const created = await this.getById(id);
 		if (!created) throw new Error('Failed to load created particular.');
@@ -79,14 +74,10 @@ export class ParticularsService {
 	static async update(input: ParticularInput & { id: string }): Promise<Particular> {
 		const before = await this.getById(input.id);
 		if (!before) throw new Error('Particular not found.');
-
-		const { name, qty, price, adjustmentDays } = normalise(input);
-
-		await db
-			.update(particulars)
-			.set({ name, qty, price: price.toFixed(2), adjustmentDays })
-			.where(eq(particulars.id, input.id));
-
+		const name = normaliseName(input.name);
+		const category = normaliseCategory(input.category);
+		await this.assertUnique(name, input.id);
+		await db.update(particulars).set({ name, category }).where(eq(particulars.id, input.id));
 		const updated = await this.getById(input.id);
 		if (!updated) throw new Error('Failed to load updated particular.');
 		return updated;
@@ -96,5 +87,22 @@ export class ParticularsService {
 		const before = await this.getById(id);
 		if (!before) return;
 		await db.delete(particulars).where(eq(particulars.id, id));
+	}
+
+	static async syncMedicinesToParticulars(): Promise<void> {
+		const medicines = await StandardMedicineService.getAll(); // archived excluded
+		const existing = await db.select({ name: particulars.name }).from(particulars);
+		const have = new Set(existing.map((p) => p.name.trim().toLowerCase()));
+
+		const toInsert: { id: string; name: string; category: ParticularCategory }[] = [];
+		for (const m of medicines) {
+			const name = m.itemName.trim();
+			const key = name.toLowerCase();
+			if (!name || have.has(key)) continue;
+			have.add(key); // also dedupes same-name medicines from different areas
+			toInsert.push({ id: randomUUID(), name, category: 'MED&VAC' });
+		}
+
+		if (toInsert.length) await db.insert(particulars).values(toInsert);
 	}
 }

@@ -1,4 +1,8 @@
-import { standard_medicine, standard_medicine_history } from '#lib/server/db/schema.ts';
+import {
+	particulars,
+	standard_medicine,
+	standard_medicine_history
+} from '#lib/server/db/schema.ts';
 import { eq, and, desc } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import type { HistoryEntry, Item, MedicineUnit } from '#lib/types/standards/medicines/items.ts';
@@ -14,6 +18,7 @@ function rowToItem(row: Row): Item {
 		itemName: row.name,
 		areaName: row.areaName,
 		value: row.value == null ? 0 : Number(row.value),
+		price: row.price == null ? 0 : Number(row.price),
 		unit: row.unit as MedicineUnit,
 		amDuration: row.amDuration,
 		amPmDuration: row.amPmDuration,
@@ -33,6 +38,7 @@ function normalise(input: {
 	itemName?: string;
 	areaName?: string;
 	value?: number | string;
+	price?: number; // widen — Drizzle decimals read back as strings
 	unit?: string;
 	amDuration?: string;
 	amPmDuration?: string;
@@ -42,6 +48,7 @@ function normalise(input: {
 	const areaName = String(input.areaName ?? '').trim();
 	const unit = String(input.unit ?? '').trim() as MedicineUnit;
 	const value = Number(input.value);
+	const price = Number(input.price); // NEW
 	const amDuration = String(input.amDuration ?? DEFAULT_AM).trim() || DEFAULT_AM;
 	const amPmDuration = String(input.amPmDuration ?? DEFAULT_AM_PM).trim() || DEFAULT_AM_PM;
 	const pmDuration = String(input.pmDuration ?? DEFAULT_PM).trim() || DEFAULT_PM;
@@ -54,11 +61,15 @@ function normalise(input: {
 	if (!Number.isFinite(value) || value < 0) {
 		throw new Error('Value must be a non-negative number.');
 	}
+	if (!Number.isFinite(price) || price < 0) {
+		// NEW
+		throw new Error('Price must be a non-negative number.');
+	}
 	if (amDuration.length > 50) throw new Error('AM duration is too long (max 50 chars).');
 	if (amPmDuration.length > 50) throw new Error('AM-PM duration is too long (max 50 chars).');
 	if (pmDuration.length > 50) throw new Error('PM duration is too long (max 50 chars).');
 
-	return { name, areaName, value, unit, amDuration, amPmDuration, pmDuration };
+	return { name, areaName, value, price, unit, amDuration, amPmDuration, pmDuration };
 }
 
 async function recordHistory(
@@ -121,6 +132,7 @@ export class StandardMedicineService {
 			itemName: string;
 			areaName: string;
 			value: number;
+			price: number;
 			unit: string;
 			amDuration?: string;
 			amPmDuration?: string;
@@ -128,7 +140,8 @@ export class StandardMedicineService {
 		},
 		changedBy?: string | null
 	): Promise<Item> {
-		const { name, areaName, value, unit, amDuration, amPmDuration, pmDuration } = normalise(input);
+		const { name, areaName, value, price, unit, amDuration, amPmDuration, pmDuration } =
+			normalise(input);
 		await this.assertUniqueActive(name, areaName);
 
 		const id = input.id ?? randomUUID();
@@ -136,7 +149,8 @@ export class StandardMedicineService {
 			id,
 			name,
 			areaName,
-			value: value.toFixed(2),
+			price: price,
+			value: value,
 			unit,
 			amDuration,
 			amPmDuration,
@@ -156,6 +170,7 @@ export class StandardMedicineService {
 			itemName: string;
 			areaName: string;
 			value: number;
+			price: number; // NEW
 			unit: string;
 			amDuration?: string;
 			amPmDuration?: string;
@@ -169,7 +184,8 @@ export class StandardMedicineService {
 			throw new Error('Cannot edit an archived item. Restore it first.');
 		}
 
-		const { name, areaName, value, unit, amDuration, amPmDuration, pmDuration } = normalise(input);
+		const { name, areaName, value, price, unit, amDuration, amPmDuration, pmDuration } =
+			normalise(input); // price now destructured
 		await this.assertUniqueActive(name, areaName, input.id);
 
 		await db
@@ -177,7 +193,8 @@ export class StandardMedicineService {
 			.set({
 				name,
 				areaName,
-				value: value.toFixed(2),
+				price: price,
+				value: value,
 				unit,
 				amDuration,
 				amPmDuration,
@@ -187,20 +204,16 @@ export class StandardMedicineService {
 
 		const changes: ChangeMap = {};
 		if (before.itemName !== name) changes.itemName = { from: before.itemName, to: name };
-		if (before.areaName !== areaName) {
-			changes.areaName = { from: before.areaName, to: areaName };
-		}
+		if (before.areaName !== areaName) changes.areaName = { from: before.areaName, to: areaName };
 		if (before.value !== value) changes.value = { from: before.value, to: value };
+		if (before.price !== price) changes.price = { from: before.price, to: price }; // NEW
 		if (before.unit !== unit) changes.unit = { from: before.unit, to: unit };
-		if (before.amDuration !== amDuration) {
+		if (before.amDuration !== amDuration)
 			changes.amDuration = { from: before.amDuration, to: amDuration };
-		}
-		if (before.amPmDuration !== amPmDuration) {
+		if (before.amPmDuration !== amPmDuration)
 			changes.amPmDuration = { from: before.amPmDuration, to: amPmDuration };
-		}
-		if (before.pmDuration !== pmDuration) {
+		if (before.pmDuration !== pmDuration)
 			changes.pmDuration = { from: before.pmDuration, to: pmDuration };
-		}
 
 		await recordHistory(
 			input.id,

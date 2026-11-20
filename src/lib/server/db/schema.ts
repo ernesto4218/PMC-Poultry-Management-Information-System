@@ -9,13 +9,15 @@ import {
 	date,
 	json,
 	decimal,
-	tinyint
+	tinyint,
+	text
 } from 'drizzle-orm/mysql-core';
 
 import type {
 	ChickBatchReportFilters,
 	ChickBatchReportSnapshotData
 } from '#lib/types/chick-batch-reports.ts';
+import { PARTICULAR_CATEGORIES } from '#lib/types/particulars.ts';
 
 export type MedicationReportSnapshot = {
 	schemaVersion: 1 | 2;
@@ -128,7 +130,12 @@ export const farm = mysqlTable(
 		code: varchar('code', { length: 150 }).notNull(),
 		type: varchar('type', { length: 150 }).notNull(),
 		volume: int('volume').notNull().default(40000),
+		staff: int('staff').notNull().default(0),
 		standardMedicationId: varchar('standard_medication_id', { length: 36 }),
+		particularsMemoryId: varchar('particulars_memory_id', { length: 36 }).references(
+			() => particulars_memory.id,
+			{ onDelete: 'set null' }
+		),
 		address: varchar('address', { length: 255 }).notNull().default(''),
 		createdAt: timestamp('created_at').defaultNow().notNull(),
 		updatedAt: timestamp('updated_at').defaultNow().onUpdateNow().notNull()
@@ -136,7 +143,8 @@ export const farm = mysqlTable(
 	(t) => [
 		uniqueIndex('farm_name_unique').on(t.name),
 		uniqueIndex('farm_code_unique').on(t.code),
-		index('farm_standard_medication_idx').on(t.standardMedicationId)
+		index('farm_standard_medication_idx').on(t.standardMedicationId),
+		index('farm_particulars_memory_idx').on(t.particularsMemoryId)
 	]
 );
 
@@ -345,7 +353,9 @@ export const standard_medicine = mysqlTable(
 		name: varchar('name', { length: 150 }).notNull(),
 		areaName: varchar('area_name', { length: 150 }).notNull(),
 		// farmType removed
-		value: decimal('value', { precision: 10, scale: 2 }).notNull().default('0'),
+		value: decimal('value', { precision: 10, scale: 2, mode: 'number' }),
+		price: decimal('price', { precision: 10, scale: 2, mode: 'number' }),
+
 		unit: varchar('unit', { length: 20 }).notNull(),
 		amDuration: varchar('am_duration', { length: 50 }).notNull().default('2-3hrs'),
 		amPmDuration: varchar('am_pm_duration', { length: 50 }).notNull().default('3 hrs'),
@@ -476,9 +486,7 @@ export const medication_report = mysqlTable(
 	{
 		id: varchar('id', { length: 36 }).primaryKey(),
 		documentId: varchar('document_id', { length: 12 }).notNull(), // printed in the barcode
-		farmId: varchar('farm_id', { length: 36 })
-			.notNull()
-			.references(() => farm.id, { onDelete: 'restrict' }),
+		farmId: varchar('farm_id', { length: 36 }).references(() => farm.id, { onDelete: 'set null' }),
 		chickBatchId: varchar('chick_batch_id', { length: 36 }), // optional link if the report is per batch
 		// denormalized copies so the list page can search without parsing JSON
 		farmCode: varchar('farm_code', { length: 150 }).notNull(),
@@ -513,22 +521,61 @@ export const chickBatchReportSnapshot = mysqlTable(
 	(t) => [index('cbrs_created_at_idx').on(t.createdAt)]
 );
 
-// ----------------------------------------------------------------------
-// Particulars
+// ---------------------------------------------------------------------------
+// Particulars (catalog — name only)
 // ---------------------------------------------------------------------------
 export const particulars = mysqlTable(
 	'particulars',
 	{
 		id: varchar('id', { length: 36 }).primaryKey(),
 		name: varchar('name', { length: 150 }).notNull(),
-		qty: int('qty').notNull().default(0),
-		price: decimal('price', { precision: 14, scale: 2 }).notNull().default('0'),
-		// Signed integer: positive = add days, negative = subtract days, null = no adjustment.
-		adjustmentDays: int('adjustment_days'),
+		category: text('category', { enum: PARTICULAR_CATEGORIES }).notNull().default('OTHERS'),
 		createdAt: timestamp('created_at').defaultNow().notNull(),
 		updatedAt: timestamp('updated_at').defaultNow().onUpdateNow().notNull()
 	},
-	(t) => [index('particulars_name_idx').on(t.name)]
+	(t) => [uniqueIndex('particulars_name_unique').on(t.name)]
+);
+
+// ---------------------------------------------------------------------------
+// Particulars: Memories (named bundles)
+// ---------------------------------------------------------------------------
+export const particulars_memory = mysqlTable(
+	'particulars_memory',
+	{
+		id: varchar('id', { length: 36 }).primaryKey(),
+		name: varchar('name', { length: 150 }).notNull(),
+		notes: varchar('notes', { length: 500 }).notNull().default(''),
+		createdAt: timestamp('created_at').defaultNow().notNull(),
+		updatedAt: timestamp('updated_at').defaultNow().onUpdateNow().notNull()
+	},
+	(t) => [index('particulars_memory_name_idx').on(t.name)]
+);
+
+// ---------------------------------------------------------------------------
+// Particulars: Memory items (particular + qty/formula/price/adjustment)
+// ---------------------------------------------------------------------------
+export const particulars_memory_item = mysqlTable(
+	'particulars_memory_item',
+	{
+		id: varchar('id', { length: 36 }).primaryKey(),
+		memoryId: varchar('memory_id', { length: 36 })
+			.notNull()
+			.references(() => particulars_memory.id, { onDelete: 'cascade' }),
+		particularId: varchar('particular_id', { length: 36 })
+			.notNull()
+			.references(() => particulars.id, { onDelete: 'restrict' }),
+		label: varchar('label', { length: 100 }).notNull().default(''),
+		mode: varchar('mode', { length: 10 }).notNull().default('static'), // 'static' | 'formula'
+		qty: decimal('qty', { precision: 14, scale: 2 }).notNull().default('0'),
+		formulaKey: varchar('formula_key', { length: 100 }),
+		formulaParams: json('formula_params').$type<Record<string, unknown> | null>(),
+		price: decimal('price', { precision: 14, scale: 2 }).notNull().default('0'),
+		adjustmentDays: int('adjustment_days'),
+		position: int('position').notNull().default(0),
+		createdAt: timestamp('created_at').defaultNow().notNull(),
+		updatedAt: timestamp('updated_at').defaultNow().onUpdateNow().notNull()
+	},
+	(t) => [index('pmi_memory_idx').on(t.memoryId), index('pmi_particular_idx').on(t.particularId)]
 );
 
 export * from './auth.schema';

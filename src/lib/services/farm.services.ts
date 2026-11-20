@@ -1,7 +1,12 @@
 // Place at: src/lib/server/services/farms.services.ts
 import { db } from '#lib/server/db/index.ts';
-import { farm } from '#lib/server/db/schema.ts';
-import { eq, or, sql, like } from 'drizzle-orm';
+import {
+	farm,
+	particulars,
+	particulars_memory,
+	particulars_memory_item
+} from '#lib/server/db/schema.ts';
+import { eq, or, sql, like, inArray } from 'drizzle-orm';
 import type { Farm } from '#lib/types/farms.ts';
 import { ChickBatchService } from './chick-batches.services';
 
@@ -63,7 +68,8 @@ export class FarmService {
 			type: data.type.trim(),
 			code: data.code.trim(),
 			volume: data.volume,
-			address: data.address.trim()
+			address: data.address.trim(),
+			particularsMemoryId: data.particularsMemoryId ?? null
 		});
 
 		return data;
@@ -87,7 +93,9 @@ export class FarmService {
 				type: data.type.trim(),
 				code: data.code.trim(),
 				volume: data.volume,
+				staff: data.staff, // <-- added
 				address: data.address.trim(),
+				particularsMemoryId: data.particularsMemoryId ?? null, // <-- added
 				updatedAt: new Date()
 			})
 			.where(eq(farm.id, data.id));
@@ -108,5 +116,91 @@ export class FarmService {
 		}
 
 		await db.delete(farm).where(eq(farm.id, id));
+	}
+
+	static async getFarmStaffInfoByCode(
+		code: string
+	): Promise<{ id: string; code: string; name: string; staff: number } | null> {
+		const trimmed = code.trim();
+		if (!trimmed) return null;
+
+		const [result] = await db
+			.select({ id: farm.id, code: farm.code, name: farm.name, staff: farm.staff })
+			.from(farm)
+			.where(sql`lower(${farm.code}) = lower(${trimmed})`)
+			.limit(1);
+
+		return result ?? null;
+	}
+
+	/** Get the particulars memory linked to a farm, by farm code. */
+	static async getMemoryByFarmCode(code: string) {
+		const trimmed = code.trim();
+		if (!trimmed) return null;
+
+		const [result] = await db
+			.select({ memory: particulars_memory })
+			.from(farm)
+			.innerJoin(particulars_memory, eq(farm.particularsMemoryId, particulars_memory.id))
+			.where(sql`lower(${farm.code}) = lower(${trimmed})`)
+			.limit(1);
+
+		return result?.memory ?? null;
+	}
+
+	/** Get the memory's items too (for building reports). */
+	static async getMemoryItemsByFarmCode(code: string) {
+		const trimmed = code.trim();
+		if (!trimmed) return [];
+
+		return db
+			.select({ item: particulars_memory_item, particular: particulars })
+			.from(farm)
+			.innerJoin(
+				particulars_memory_item,
+				eq(particulars_memory_item.memoryId, farm.particularsMemoryId)
+			)
+			.innerJoin(particulars, eq(particulars.id, particulars_memory_item.particularId))
+			.where(sql`lower(${farm.code}) = lower(${trimmed})`)
+			.orderBy(particulars_memory_item.position);
+	}
+
+	/** Retrieve a single farm by its code (case-insensitive) */
+	static async getFarmByCode(code: string): Promise<Farm | null> {
+		const trimmed = code.trim();
+		if (!trimmed) return null;
+
+		const [result] = await db
+			.select()
+			.from(farm)
+			.where(sql`lower(${farm.code}) = lower(${trimmed})`)
+			.limit(1);
+
+		return result ?? null;
+	}
+
+	static async getMemoryWithItemsById(memoryId: string) {
+		const trimmed = memoryId?.trim();
+		if (!trimmed) return null;
+
+		const [memory] = await db
+			.select()
+			.from(particulars_memory)
+			.where(eq(particulars_memory.id, trimmed))
+			.limit(1);
+
+		if (!memory) return null;
+
+		const items = await db
+			.select({ item: particulars_memory_item, particular: particulars })
+			.from(particulars_memory_item)
+			.innerJoin(particulars, eq(particulars.id, particulars_memory_item.particularId))
+			.where(eq(particulars_memory_item.memoryId, trimmed))
+			.orderBy(particulars_memory_item.position);
+
+		return {
+			...memory,
+			items: items.map((i) => ({ ...i.item, particular: i.particular }))
+		};
 	}
 }

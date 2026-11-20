@@ -1,0 +1,1 @@
+ALTER TABLE `standard_medicine` ADD `price` decimal(10,2);

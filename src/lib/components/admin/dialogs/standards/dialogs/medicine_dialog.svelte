@@ -27,6 +27,7 @@
 		itemName: string;
 		areaName: string;
 		value: string;
+		price: string;
 		unit: MedicineUnit | '';
 		amDuration: string;
 		amPmDuration: string;
@@ -36,6 +37,7 @@
 	function emptyItemForm(): ItemForm {
 		return {
 			itemName: '',
+			price: '',
 			areaName: '',
 			value: '',
 			unit: '',
@@ -50,6 +52,7 @@
 			itemName: item.itemName,
 			areaName: item.areaName,
 			value: String(item.value),
+			price: String(item.price),
 			unit: item.unit,
 			amDuration: item.amDuration,
 			amPmDuration: item.amPmDuration,
@@ -129,11 +132,16 @@
 	const valueNum = $derived(Number(valueText));
 	const valueValid = $derived(valueText !== '' && Number.isFinite(valueNum) && valueNum >= 0);
 
+	const priceText = $derived(String(form.price ?? '').trim());
+	const priceNum = $derived(Number(priceText));
+	const priceValid = $derived(priceText !== '' && Number.isFinite(priceNum) && priceNum >= 0);
+
 	const canSave = $derived(
 		form.itemName.trim() !== '' &&
 			form.areaName.trim() !== '' &&
 			form.unit !== '' &&
 			valueValid &&
+			priceValid &&
 			!duplicateItem
 	);
 
@@ -148,6 +156,7 @@
 				itemName: form.itemName.trim(),
 				areaName: form.areaName.trim(),
 				value: valueNum,
+				price: priceNum,
 				unit: form.unit as MedicineUnit,
 				amDuration: form.amDuration.trim() || DEFAULT_AM,
 				amPmDuration: form.amPmDuration.trim() || DEFAULT_AM_PM,
@@ -197,7 +206,7 @@
 					<Input
 						id="itemName"
 						bind:value={form.itemName}
-						placeholder="e.g. AMPROLIUM"
+						placeholder="e.g. Amilyte"
 						required
 						autocomplete="off"
 						aria-invalid={duplicateItem}
@@ -261,8 +270,8 @@
 					{/if}
 				</div>
 
-				<!-- Value + Unit -->
-				<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+				<!-- Value + Price + Unit (single row on sm+) -->
+				<div class="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-start">
 					<div class="space-y-1.5">
 						<Label for="value" class={labelCls}>
 							Value <span class="text-red-600">*</span>
@@ -287,6 +296,29 @@
 					</div>
 
 					<div class="space-y-1.5">
+						<Label for="price" class={labelCls}>
+							Price <span class="text-red-600">*</span>
+						</Label>
+						<Input
+							id="price"
+							type="number"
+							step="0.01"
+							min="0"
+							inputmode="decimal"
+							bind:value={form.price}
+							placeholder="e.g. 100"
+							required
+							aria-invalid={priceText !== '' && !priceValid}
+							class={inputCls}
+						/>
+						{#if priceText !== '' && !priceValid}
+							<p class="text-xs text-red-600">Enter a valid non-negative number.</p>
+						{:else}
+							<p class="text-xs text-gray-500">Up to 2 decimal places.</p>
+						{/if}
+					</div>
+
+					<div class="w-28 space-y-1.5">
 						<Label for="unit" class={labelCls}>
 							Unit <span class="text-red-600">*</span>
 						</Label>

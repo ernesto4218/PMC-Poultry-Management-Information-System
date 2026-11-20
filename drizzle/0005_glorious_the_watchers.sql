@@ -1,0 +1,1 @@
+ALTER TABLE `particulars` ADD `qty_formula` json;

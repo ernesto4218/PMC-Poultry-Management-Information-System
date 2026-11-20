@@ -21,6 +21,7 @@ export class MedicationMemoryService {
 				areaName: standard_medicine.areaName,
 				unit: standard_medicine.unit,
 				value: standard_medicine.value,
+				price: standard_medicine.price,
 				isArchived: standard_medicine.isArchived,
 				ages: medication_memory.ages
 			})
@@ -37,6 +38,7 @@ export class MedicationMemoryService {
 				areaName: r.areaName,
 				unit: r.unit,
 				value: r.value == null ? 0 : Number(r.value),
+				price: r.price == null ? 0 : Number(r.price),
 				ages: r.ages ?? []
 			});
 		}

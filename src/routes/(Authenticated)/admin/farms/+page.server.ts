@@ -2,14 +2,16 @@
 import type { PageServerLoad } from './$types';
 import { FarmService } from '#lib/services/farm.services.ts';
 import { ChickBatchService } from '#lib/services/chick-batches.services.ts';
+import { ParticularsMemoryService } from '#lib/services/particulars-memories.services.ts';
 
 type FarmStat = { batches: number; chicks: number; lastSet: string | null };
 
 export const load: PageServerLoad = async () => {
 	try {
-		const [farms, batches] = await Promise.all([
+		const [farms, batches, memory] = await Promise.all([
 			FarmService.getAllFarms(),
-			ChickBatchService.getAllBatches()
+			ChickBatchService.getAllBatches(),
+			ParticularsMemoryService.listMemories()
 		]);
 
 		// Aggregate batches per farm
@@ -25,6 +27,7 @@ export const load: PageServerLoad = async () => {
 
 		return {
 			farms,
+			memory,
 			farmStats: Object.fromEntries(perFarm) as Record<string, FarmStat>,
 			totals: {
 				farms: farms.length,

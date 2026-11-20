@@ -3,7 +3,9 @@ import { building } from '$app/env';
 import { auth } from '#lib/server/auth.ts';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { redirect, json } from '@sveltejs/kit';
+import { registerParticularsFormulas } from '#lib/server/particulars-formulas.server.ts';
 
+registerParticularsFormulas();
 // Define a map of protected API routes and the roles allowed to access them
 const apiRolePermissions: { route: string; allowedRoles: string[] }[] = [
 	{ route: '/api/admin', allowedRoles: ['Admin'] },

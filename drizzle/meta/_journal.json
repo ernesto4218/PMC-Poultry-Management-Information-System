@@ -36,6 +36,76 @@
       "when": 1794837214617,
       "tag": "0004_ordinary_squadron_sinister",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1794875171122,
+      "tag": "0005_glorious_the_watchers",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1794876664876,
+      "tag": "0006_lowly_gladiator",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1794880040851,
+      "tag": "0007_blushing_lightspeed",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1794880718535,
+      "tag": "0008_high_krista_starr",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1794965345591,
+      "tag": "0009_famous_mandarin",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1794966129756,
+      "tag": "0010_pale_fat_cobra",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1795051158024,
+      "tag": "0011_tiny_talos",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1795153049314,
+      "tag": "0012_flowery_hobgoblin",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1795154472642,
+      "tag": "0013_sweet_random",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1795155105613,
+      "tag": "0014_special_blackheart",
+      "breakpoints": true
     }
   ]
 }

@@ -8,6 +8,7 @@ export type MemoryColumn = {
 	areaName: string;
 	unit: string;
 	value: number;
+	price: number;
 	ages: string[];
 };
 

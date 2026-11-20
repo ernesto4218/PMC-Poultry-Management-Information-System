@@ -1,0 +1,1 @@
+ALTER TABLE `particulars` MODIFY COLUMN `category` text NOT NULL DEFAULT ('OTHERS');
