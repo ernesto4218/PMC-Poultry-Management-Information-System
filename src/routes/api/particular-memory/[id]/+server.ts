@@ -7,11 +7,13 @@ export const GET: RequestHandler = async ({ params, url }) => {
 	// 1. Extract query parameters sent from the client (e.g., ?code=JAYS2-H2)
 	const farmCode = url.searchParams.get('code') ?? '';
 	const farmId = url.searchParams.get('farmId') ?? farmCode;
+	const volume = url.searchParams.get('volume') ?? '';
 
 	// 2. Build the context object that your formulas expect (ctx)
 	const context = {
 		farmId,
-		farmCode
+		farmCode,
+		volume
 		// You can include any other request-scoped data here
 	};
 

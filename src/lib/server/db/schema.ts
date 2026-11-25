@@ -18,6 +18,7 @@ import type {
 	ChickBatchReportSnapshotData
 } from '#lib/types/chick-batch-reports.ts';
 import { PARTICULAR_CATEGORIES } from '#lib/types/particulars.ts';
+import type { BudgetReportSnapshot } from '#lib/budget/budget-snapshot.ts';
 
 export type MedicationReportSnapshot = {
 	schemaVersion: 1 | 2;
@@ -576,6 +577,36 @@ export const particulars_memory_item = mysqlTable(
 		updatedAt: timestamp('updated_at').defaultNow().onUpdateNow().notNull()
 	},
 	(t) => [index('pmi_memory_idx').on(t.memoryId), index('pmi_particular_idx').on(t.particularId)]
+);
+
+export const budget_report = mysqlTable(
+	'budget_report',
+	{
+		id: varchar('id', { length: 36 }).primaryKey(),
+		documentId: varchar('document_id', { length: 12 }).notNull(), // printed in the barcode: B + YYMMDD + 5 digits
+		farmId: varchar('farm_id', { length: 36 }).references(() => farm.id, { onDelete: 'set null' }),
+		chickBatchId: varchar('chick_batch_id', { length: 36 }).notNull(),
+		// denormalized copies so the list page can search without parsing JSON
+		batchNumber: varchar('batch_number', { length: 100 }).notNull().default(''),
+		farmCode: varchar('farm_code', { length: 150 }).notNull(),
+		farmName: varchar('farm_name', { length: 150 }).notNull(),
+		volume: int('volume').notNull(),
+		grandTotal: decimal('grand_total', { precision: 14, scale: 2, mode: 'number' })
+			.notNull()
+			.default(0),
+		contentHash: varchar('content_hash', { length: 64 }).notNull(),
+		snapshot: json('snapshot').$type<BudgetReportSnapshot>().notNull(),
+		status: varchar('status', { length: 20 }).notNull().default('active'), // 'active' | 'void'
+		createdBy: varchar('created_by', { length: 36 }),
+		createdAt: timestamp('created_at').defaultNow().notNull()
+	},
+	(t) => [
+		uniqueIndex('budget_report_document_id_unique').on(t.documentId),
+		index('budget_report_farm_created_idx').on(t.farmId, t.createdAt),
+		index('budget_report_batch_idx').on(t.chickBatchId),
+		index('budget_report_farm_hash_idx').on(t.farmId, t.contentHash),
+		index('budget_report_created_idx').on(t.createdAt)
+	]
 );
 
 export * from './auth.schema';

@@ -136,7 +136,7 @@
 		<div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
 			<div>
 				<a
-					href="/particulars"
+					href="/admin/budget-placement/particulars"
 					class="inline-flex items-center gap-1 text-xs font-semibold tracking-wider text-red-700 uppercase hover:underline"
 				>
 					<ArrowLeftIcon class="h-3 w-3" /> Particulars

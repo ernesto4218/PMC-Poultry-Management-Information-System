@@ -22,17 +22,20 @@ export const amountCalculators: Record<ParticularCategory, AmountCalculator> = {
 	OTHERS: basicAmount,
 
 	ADVANCES: (i) => {
-		const cycle = Number(i.formulaParams?.['cycle']);
+		const raw = i.formulaParams?.['cycle'];
+		const cycle = raw ? Number(raw) : NaN;
 		if (Number.isFinite(cycle)) {
 			return qtyOf(i) * i.price * cycle;
 		}
 
 		// Non-formula one-offs
-		switch (i.particularName) {
-			case 'Farm Overtime':
-				return 4 * 21 * 72.5 * 4;
-			case 'PHIC':
-			case 'PAG-IBIG':
+		switch (i.particularName.toLowerCase()) {
+			case 'farm overtime':
+				return 4 * 21 * 72.5 * qtyOf(i);
+			case 'farm overtime harvest':
+				return qtyOf(i) * 7 * i.price * 4;
+			case 'farm overtime brooding':
+				return qtyOf(i) * 14 * i.price * 4;
 			default:
 				return basicAmount(i);
 		}

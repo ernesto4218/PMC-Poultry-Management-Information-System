@@ -331,5 +331,5 @@
 	</div>
 
 	<!-- Vitamins summary, fed by the same snapshot -->
-	<MedicationSummary {schedule} birdCount={volume} />
+	<MedicationSummary {schedule} birdCount={volume} {vaccination} />
 </div>

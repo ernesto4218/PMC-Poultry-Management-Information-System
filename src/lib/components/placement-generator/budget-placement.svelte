@@ -1,10 +1,5 @@
 <script lang="ts">
-	import {
-		FEED_CATEGORY,
-		FEED_TRUCKING_RATE,
-		FEED_LABOR_RATE,
-		parseFeed
-	} from '#lib/utils/feeds.ts';
+	import { FEED_CATEGORY, FEED_LABOR_RATE, parseFeed } from '#lib/utils/feeds.ts';
 	import { toTitle } from '#lib/utils/format.ts';
 	import { computeAmount } from '#lib/utils/particular-amount.ts';
 	import { PARTICULAR_CATEGORIES } from '#lib/types/particulars.ts';
@@ -18,10 +13,22 @@
 	import MedicationTable from '../admin/med-guide/medication-table.svelte';
 	import type { MedicationSnapshot } from '#lib/types/standards/medications/items.ts';
 
+	import ParticularPrintDialog from './particular-print-dialog.svelte';
+
 	let { data } = $props();
 	let schedule = $state<MedicationSnapshot | null>(null);
 	let qty = $state<Record<string, string>>({});
 	let price = $state<Record<string, string>>({});
+	let feedsTotalPerChick = $state(0);
+
+	// --------------------------------------------------
+	// FEED RATES (BY FARM TYPE)
+	// --------------------------------------------------
+
+	const FEED_RATES = {
+		CCS: { trucking: 60, labor: FEED_LABOR_RATE },
+		CON: { trucking: 65, labor: FEED_LABOR_RATE }
+	} as const;
 
 	// --------------------------------------------------
 	// BATCH SELECTION
@@ -50,6 +57,7 @@
 	const selectedBatch = $derived(data.batches.find((b: any) => b.id === selectedBatchId));
 	const selectedFarm = $derived(selectedBatch?.farm ?? null);
 	const group = $derived(selectedFarm ? farmGroupOf(selectedFarm.type) : null);
+	const feedRates = $derived(selectedFarm?.type === 'CCS' ? FEED_RATES.CCS : FEED_RATES.CON);
 	const vitaminsSummary = $derived(buildSummary(schedule, selectedBatch?.volume ?? 0, qty, price));
 	const VITAMINS_CATEGORY = PARTICULAR_CATEGORIES.find((c) => /med|vit/i.test(String(c)));
 
@@ -163,8 +171,8 @@
 			}
 		}
 
-		const truckingAmount = feedQuantity * FEED_TRUCKING_RATE;
-		const laborAmount = feedQuantity * FEED_LABOR_RATE;
+		const truckingAmount = feedQuantity * feedRates.trucking;
+		const laborAmount = feedQuantity * feedRates.labor;
 
 		const othersCategory = PARTICULAR_CATEGORIES.find(
 			(c) => String(c).trim().toUpperCase() === 'OTHERS'
@@ -254,8 +262,8 @@
 			.map((g) => ({ ...g, perChick: volume ? g.amount / volume : 0 }));
 
 		const extraRows = [
-			{ name: 'Feeds Trucking', rate: FEED_TRUCKING_RATE },
-			{ name: 'Feeds Labor', rate: FEED_LABOR_RATE }
+			{ name: 'Feeds Trucking', rate: feedRates.trucking },
+			{ name: 'Feeds Labor', rate: feedRates.labor }
 		].map((e) => {
 			const amt = qty * e.rate;
 			return {
@@ -311,6 +319,24 @@
 
 			<div class="flex items-center gap-3">
 				<BatchSelector {groups} {selectedBatch} {selectedFarm} onSelect={select} />
+				{#if selectedBatch && selectedFarm && selectedMemory?.items?.length}
+					<ParticularPrintDialog
+						farm={selectedFarm}
+						batchId={selectedBatch.id}
+						batchNumber={selectedBatch.batchNumber}
+						batchDateSet={selectedBatch.dateSet}
+						dateSet={selectedBatch.dateSet}
+						volume={selectedBatch.volume}
+						birdcount={selectedBatch.volume}
+						type={selectedFarm.type}
+						memory={selectedMemory}
+						vitamins={vitaminsSummary.rows}
+						vitaminsCategory={VITAMINS_CATEGORY}
+						{feeds}
+						{categoryTotals}
+						{grandTotal}
+					/>
+				{/if}
 			</div>
 		</div>
 
@@ -321,6 +347,7 @@
 			<!-- PARTICULARS MEMORY -->
 			{#if selectedMemoryId}
 				<ParticularsTable
+					birdcount={selectedBatch?.volume ?? 0}
 					memory={selectedMemory}
 					vitamins={vitaminsSummary.rows}
 					vitaminsCategory={VITAMINS_CATEGORY}
@@ -332,11 +359,17 @@
 					{feeds}
 					loading={loadingMemory}
 					error={memoryError}
+					totalPerChick={feedsTotalPerChick}
 				/>
 
 				<!-- FEEDS SUMMARY -->
 				{#if selectedMemory?.items?.length && feeds.rows.length}
-					<FeedsSummary {feeds} volume={selectedBatch.volume} />
+					<FeedsSummary
+						{feeds}
+						type={selectedFarm.type}
+						volume={selectedBatch.volume}
+						bind:totalPerChick={feedsTotalPerChick}
+					/>
 				{/if}
 			{/if}
 		{:else}

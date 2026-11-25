@@ -8,9 +8,12 @@
 		formatNumber,
 		formatCurrency,
 		formatDateShort,
-		addDaysToDate
+		addDaysToDate,
+		formatPerChick
 	} from '#lib/utils/format.ts';
 	import { toolbar, tableRoot, tableWrap, th, thFirst, tdBase, tdFirst, tfBase } from './styles.ts';
+
+	const round1 = (n: number) => Math.round(n * 10) / 10;
 
 	let {
 		memory,
@@ -21,6 +24,8 @@
 		categoryTotals,
 		grandTotal,
 		feeds,
+		birdcount,
+		totalPerChick,
 		loading = false,
 		error = null
 	}: {
@@ -34,7 +39,21 @@
 		feeds: any;
 		loading?: boolean;
 		error?: string | null;
+		birdcount: any;
+		totalPerChick: any;
 	} = $props();
+
+	const perChickByCategory = $derived.by(() => {
+		const out: Record<string, number> = {};
+		for (const c of PARTICULAR_CATEGORIES) {
+			out[c] = birdcount > 0 ? round1(categoryTotals[c] / birdcount) : 0;
+		}
+		return out;
+	});
+
+	const grandPerChick = $derived(
+		PARTICULAR_CATEGORIES.reduce((s, c) => s + perChickByCategory[c], 0)
+	);
 
 	$effect(() => {
 		console.log('Vitamins from particulars table s', vitamins);
@@ -219,6 +238,22 @@
 
 							<Table.Cell class="{tfBase} font-mono tabular-nums">
 								₱{formatCurrency(grandTotal)}
+							</Table.Cell>
+						</Table.Row>
+
+						<Table.Row class="border-0 hover:bg-transparent">
+							<Table.Cell colspan={5} class="{tfBase} text-right tracking-wider uppercase">
+								Total
+							</Table.Cell>
+
+							{#each PARTICULAR_CATEGORIES as c (c)}
+								<Table.Cell class="{tfBase} text-right font-mono tabular-nums">
+									{formatPerChick(perChickByCategory[c])}
+								</Table.Cell>
+							{/each}
+
+							<Table.Cell class="{tfBase} text-right font-mono tabular-nums">
+								{formatPerChick(grandPerChick)} / Bird
 							</Table.Cell>
 						</Table.Row>
 					</Table.Footer>
