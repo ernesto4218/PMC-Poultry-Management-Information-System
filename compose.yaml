@@ -32,6 +32,8 @@ services:
       interval: 10s
       retries: 10
     mem_limit: 768m
+    ports:
+      - '127.0.0.1:3306:3306'
 
   adminer:
     image: adminer
