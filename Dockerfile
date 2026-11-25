@@ -3,7 +3,11 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-RUN npm run build
+RUN DATABASE_URL="mysql://user:pass@localhost:3306/db" \
+    ORIGIN="http://localhost:3000" \
+    BETTER_AUTH_SECRET="build-only-placeholder-0123456789abcdef" \
+    BETTER_AUTH_URL="http://localhost:3000" \
+    npm run build
 RUN npm prune --omit=dev
 
 FROM node:22-alpine
