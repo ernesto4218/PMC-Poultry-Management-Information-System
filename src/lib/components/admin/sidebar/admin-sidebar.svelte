@@ -29,7 +29,8 @@
 		MemoryStickIcon,
 		ListOrdered,
 		CpuIcon,
-		Pill
+		Pill,
+		User
 	} from '@lucide/svelte';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
@@ -107,15 +108,15 @@
 				}
 			]
 		},
-		{
-			label: 'Budget & Finance',
-			items: [
-				{ title: 'Budget Tracking', url: '/admin/budget/tracking', icon: Wallet },
-				{ title: 'Budget Generator', url: '/admin/budget/generator', icon: Calculator },
-				{ title: 'Expenses & Feeds Cost', url: '/admin/budget/expenses', icon: Receipt },
-				{ title: 'Cycle Costing Reports', url: '/admin/budget/reports', icon: TrendingUp }
-			]
-		},
+		// {
+		// 	label: 'Budget & Finance',
+		// 	items: [
+		// 		{ title: 'Budget Tracking', url: '/admin/budget/tracking', icon: Wallet },
+		// 		{ title: 'Budget Generator', url: '/admin/budget/generator', icon: Calculator },
+		// 		{ title: 'Expenses & Feeds Cost', url: '/admin/budget/expenses', icon: Receipt },
+		// 		{ title: 'Cycle Costing Reports', url: '/admin/budget/reports', icon: TrendingUp }
+		// 	]
+		// },
 		{
 			label: 'System',
 			items: [
@@ -379,9 +380,13 @@
 								>
 									<div class="flex w-full flex-row items-center gap-2.5 overflow-hidden">
 										<Avatar.Root class="h-9 w-9 shrink-0 ring-2 ring-amber-400/40">
-											<Avatar.Image src="/company_logo.png" alt="Avatar" />
-											<Avatar.Fallback class="bg-red-600 font-bold text-white">
-												{user?.name?.charAt(0) ?? 'A'}
+											{#if user?.image}
+												<Avatar.Image src={user.image} alt={user?.name ?? 'Avatar'} />
+											{/if}
+											<Avatar.Fallback
+												class="bg-linear-to-br from-red-600 to-orange-500 font-bold text-white"
+											>
+												{user?.name?.charAt(0)?.toUpperCase() ?? 'A'}
 											</Avatar.Fallback>
 										</Avatar.Root>
 
@@ -409,14 +414,18 @@
 							class="w-56 border-amber-100 shadow-lg"
 						>
 							<DropdownMenu.Group>
+								<DropdownMenu.Item onSelect={() => goto('/admin/profile')}>
+									<User class="size-4 text-gray-500" />
+									<span class="text-xs font-medium text-gray-700">Profile</span>
+								</DropdownMenu.Item>
+							</DropdownMenu.Group>
+
+							<DropdownMenu.Separator />
+
+							<DropdownMenu.Group>
 								<DropdownMenu.Item onSelect={handleSignOut}>
-									<button
-										type="button"
-										class="flex w-full flex-row items-center gap-2 text-xs font-medium text-red-600 hover:text-red-700"
-									>
-										<LogOut class="size-4" />
-										<span>Log out</span>
-									</button>
+									<LogOut class="size-4 text-red-600" />
+									<span class="text-xs font-medium text-red-600">Log out</span>
 								</DropdownMenu.Item>
 							</DropdownMenu.Group>
 						</DropdownMenu.Content>
