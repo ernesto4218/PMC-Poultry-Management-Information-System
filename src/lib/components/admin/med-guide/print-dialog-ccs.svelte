@@ -6,6 +6,7 @@
 	import { downloadElementAsPdf } from './download-pdf';
 	import ReportSheet from './report-sheet.svelte';
 	import { buildVaccination, NET_FACTOR } from '#lib/medication/medication.ts';
+	import { printAreaClass } from '#lib/types/print-dialog.ts';
 
 	type Column = {
 		id: string;
@@ -153,11 +154,7 @@
 			Print
 		</Button>
 	</Dialog.Trigger>
-	<Dialog.Content
-		id="print-area"
-		class="flex min-h-[8in] min-w-[13in] flex-col overflow-auto p-4
-	       print:top-0 print:left-0 print:max-w-none print:translate-x-0 print:translate-y-0 print:overflow-hidden"
-	>
+	<Dialog.Content id="print-area" class={printAreaClass}>
 		<ReportSheet {snapshot} documentId={docId} createdAt={isSaved ? saved!.createdAt : null}>
 			{#snippet actions()}
 				{#if saveError}

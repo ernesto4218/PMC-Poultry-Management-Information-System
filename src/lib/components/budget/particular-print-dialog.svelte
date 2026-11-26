@@ -6,6 +6,7 @@
 	import { downloadElementAsPdf } from '#lib/components/admin/med-guide/download-pdf.js';
 	import ParticularsReportSheet from './particulars-report-sheet.svelte';
 	import { buildBudgetBody, type BudgetReportSnapshot } from '#lib/budget/budget-snapshot.ts';
+	import { printAreaClass } from '#lib/types/print-dialog.ts';
 
 	type Farm = { id: string; name: string; code: string; type?: string; address?: string };
 
@@ -153,11 +154,7 @@
 			Print
 		</Button>
 	</Dialog.Trigger>
-	<Dialog.Content
-		id="print-area"
-		class="min-max-h-[8in] min-max-w-[13in] flex flex-col overflow-auto p-4
-	       print:top-0 print:left-0 print:max-w-none print:translate-x-0 print:translate-y-0 print:overflow-hidden"
-	>
+	<Dialog.Content id="print-area" class={printAreaClass}>
 		<ParticularsReportSheet
 			{snapshot}
 			documentId={docId}
