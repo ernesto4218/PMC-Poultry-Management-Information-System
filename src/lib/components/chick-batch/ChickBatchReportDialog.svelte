@@ -10,6 +10,7 @@
 		ChickBatchReportFilters,
 		ChickBatchReportSnapshotData
 	} from '#lib/types/chick-batch-reports.ts';
+	import { printAreaClass } from '#lib/types/print-dialog.ts';
 
 	let {
 		open = $bindable(false),
@@ -113,7 +114,7 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content id="print-area" class="flex min-h-[7in] min-w-[13in] flex-col overflow-auto p-4">
+	<Dialog.Content id="print-area" class={printAreaClass}>
 		<ChickBatchReportSheet
 			{snapshot}
 			documentId={docId}

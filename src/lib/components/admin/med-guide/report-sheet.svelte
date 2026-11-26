@@ -84,7 +84,7 @@
 		'border-r border-b border-black px-1 py-0 text-center align-middle h-6 w-14 text-[8px] leading-none font-bold whitespace-nowrap text-gray-900';
 </script>
 
-<div class="relative flex flex-col gap-4">
+<div class="relative flex h-full w-full flex-col gap-4">
 	{#if voided}
 		<div
 			class="pointer-events-none absolute inset-0 z-40 flex items-center justify-center text-[10rem] font-black tracking-widest text-red-600/15 uppercase"
