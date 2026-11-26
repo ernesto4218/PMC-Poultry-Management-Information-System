@@ -19,6 +19,8 @@ import type {
 } from '#lib/types/chick-batch-reports.ts';
 import { PARTICULAR_CATEGORIES } from '#lib/types/particulars.ts';
 import type { BudgetReportSnapshot } from '#lib/budget/budget-snapshot.ts';
+import { driverStatuses } from '#lib/types/drivers.ts';
+import { truckStatuses } from '#lib/types/trucks.ts';
 
 export type MedicationReportSnapshot = {
 	schemaVersion: 1 | 2;
@@ -606,6 +608,97 @@ export const budget_report = mysqlTable(
 		index('budget_report_batch_idx').on(t.chickBatchId),
 		index('budget_report_farm_hash_idx').on(t.farmId, t.contentHash),
 		index('budget_report_created_idx').on(t.createdAt)
+	]
+);
+
+// ---------------------------------------------------------------------------
+// Drivers & Trucks (logistics)
+// ---------------------------------------------------------------------------
+export const driver = mysqlTable(
+	'driver',
+	{
+		id: varchar('id', { length: 36 }).primaryKey(),
+		name: varchar('name', { length: 150 }).notNull().default(''),
+		phone: varchar('phone', { length: 80 }).notNull().default(''),
+		address: varchar('address', { length: 255 }).notNull().default(''),
+		status: varchar('status', { length: 20, enum: driverStatuses }).notNull().default('Active'),
+		notes: varchar('notes', { length: 500 }).notNull().default(''),
+		createdAt: timestamp('created_at').defaultNow().notNull(),
+		updatedAt: timestamp('updated_at').defaultNow().onUpdateNow().notNull()
+	},
+	(t) => [index('driver_name_idx').on(t.name), index('driver_status_idx').on(t.status)]
+);
+
+export const truck = mysqlTable(
+	'truck',
+	{
+		id: varchar('id', { length: 36 }).primaryKey(),
+		plateNumber: varchar('plate_number', { length: 50 }).notNull(),
+		capacity: int('capacity').notNull().default(0),
+		status: varchar('status', { length: 20, enum: truckStatuses }).notNull().default('Active'),
+		driverId: varchar('driver_id', { length: 36 }).references(() => driver.id, {
+			onDelete: 'set null'
+		}),
+		notes: varchar('notes', { length: 500 }).notNull().default(''),
+		createdAt: timestamp('created_at').defaultNow().notNull(),
+		updatedAt: timestamp('updated_at').defaultNow().onUpdateNow().notNull()
+	},
+	(t) => [
+		uniqueIndex('truck_plate_unique').on(t.plateNumber),
+		index('truck_driver_idx').on(t.driverId),
+		index('truck_status_idx').on(t.status)
+	]
+);
+
+// ---------------------------------------------------------------------------
+// Warehouse: feed stock & movements (single central hub)
+// ---------------------------------------------------------------------------
+export const feed_stock = mysqlTable(
+	'feed_stock',
+	{
+		id: varchar('id', { length: 36 }).primaryKey(),
+		feedProductId: varchar('feed_product_id', { length: 36 })
+			.notNull()
+			.references(() => feedProduct.id, { onDelete: 'restrict' }),
+		onHand: int('on_hand').notNull().default(0),
+		minStock: int('min_stock').notNull().default(0),
+		updatedAt: timestamp('updated_at').defaultNow().onUpdateNow().notNull()
+	},
+	(t) => [uniqueIndex('feed_stock_product_unique').on(t.feedProductId)]
+);
+
+export const feed_stock_movement = mysqlTable(
+	'feed_stock_movement',
+	{
+		id: varchar('id', { length: 36 }).primaryKey(),
+		// 'delivery' | 'from-farm' | 'to-farm' | 'adjustment'
+		movementType: varchar('movement_type', { length: 30 }).notNull(),
+		// 'in' | 'out'
+		direction: varchar('direction', { length: 3 }).notNull(),
+		feedProductId: varchar('feed_product_id', { length: 36 })
+			.notNull()
+			.references(() => feedProduct.id, { onDelete: 'restrict' }),
+		supplierId: varchar('supplier_id', { length: 36 }).references(() => feedSupplier.id, {
+			onDelete: 'set null'
+		}),
+		farmId: varchar('farm_id', { length: 36 }).references(() => farm.id, {
+			onDelete: 'set null'
+		}),
+		driverId: varchar('driver_id', { length: 36 }).references(() => driver.id, {
+			onDelete: 'set null'
+		}),
+		qty: int('qty').notNull(), // in sacks
+		chickInCode: varchar('chick_in_code', { length: 100 }).notNull().default(''),
+		truckPlate: varchar('truck_plate', { length: 50 }).notNull().default(''),
+		status: varchar('status', { length: 20 }).notNull().default('Completed'),
+		remarks: varchar('remarks', { length: 500 }).notNull().default(''),
+		createdAt: timestamp('created_at').defaultNow().notNull()
+	},
+	(t) => [
+		index('fsm_created_idx').on(t.createdAt),
+		index('fsm_product_idx').on(t.feedProductId),
+		index('fsm_type_idx').on(t.movementType),
+		index('fsm_status_idx').on(t.status)
 	]
 );
 

@@ -1,7 +1,7 @@
 import { db } from '#lib/server/db/index.ts';
 import { farm, budget_report, chickBatch } from '#lib/server/db/schema.ts';
 import type { BudgetReportSnapshot, BudgetSnapshotBody } from '#lib/budget/budget-snapshot.ts';
-import { and, desc, eq, gte, like, lt } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, like, lt } from 'drizzle-orm';
 import { createHash, randomInt, randomUUID } from 'node:crypto';
 
 export type SaveBudgetReportInput = {
@@ -187,5 +187,12 @@ export class BudgetReportService {
 		if (!row) throw new Error('Report not found.');
 		if (row.status === 'void') return;
 		await db.update(budget_report).set({ status: 'void' }).where(eq(budget_report.id, row.id));
+	}
+
+	static async getManyByDocumentIds(documentIds: string[]) {
+		const ids = Array.from(new Set(documentIds.filter(Boolean)));
+		if (ids.length === 0) return [];
+
+		return db.select().from(budget_report).where(inArray(budget_report.documentId, ids));
 	}
 }

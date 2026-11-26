@@ -30,7 +30,12 @@
 		ListOrdered,
 		CpuIcon,
 		Pill,
-		User
+		User,
+		SquareArrowDownExit,
+		CornerRightDown,
+		Truck,
+		UserPlus,
+		MapPin
 	} from '@lucide/svelte';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
@@ -59,9 +64,9 @@
 			label: 'Overview',
 			items: [
 				{ title: 'Dashboard', url: '/admin/dashboard', icon: LayoutDashboard },
-				{ title: 'Analytics', url: '/admin/analytics', icon: ChartNoAxesCombined }
+				{ title: 'Analytics', url: '/admin/analytics', icon: ChartNoAxesCombined },
 				// { title: 'Standard Management', url: '/admin/standard-management', icon: Shield },
-				// { title: 'Suppliers', url: '/admin/suppliers', icon: Package }
+				{ title: 'Suppliers', url: '/admin/suppliers', icon: Package }
 			]
 		},
 		{
@@ -71,6 +76,7 @@
 				{ title: 'Map', url: '/admin/farm-map', icon: MapPinHouseIcon }
 			]
 		},
+
 		{
 			label: 'Chick Management',
 			items: [
@@ -94,7 +100,13 @@
 						{ title: 'Memory', url: '/admin/med-guide/memory', icon: MemoryStickIcon },
 						{ title: 'Reports', url: '/admin/med-guide/med-reports', icon: Newspaper }
 					]
-				},
+				}
+			]
+		},
+
+		{
+			label: 'Budget & Finance',
+			items: [
 				{
 					title: 'Budget Placement',
 					url: '/admin/budget-placement',
@@ -106,6 +118,25 @@
 						{ title: 'Reports', url: '/admin/budget-placement/reports', icon: Newspaper }
 					]
 				}
+			]
+		},
+
+		{
+			label: 'Fleet & Logistics',
+			items: [
+				{ title: 'Warehouse', url: '/admin/warehouse', icon: Warehouse },
+				{
+					title: 'Pull Out Requests',
+					url: '/admin/pull-out',
+					icon: SquareArrowDownExit,
+					children: [
+						{ title: 'Pull out', url: '/admin/pull-out/records', icon: CornerRightDown },
+						{ title: 'Warehouse', url: '/admin/pull-out/warehouse', icon: Warehouse }
+					]
+				},
+				{ title: 'Trucks', url: '/admin/trucks', icon: Truck },
+				{ title: 'Drivers', url: '/admin/drivers', icon: UserPlus },
+				{ title: 'GPS Tracking', url: '/admin/gps-tracking', icon: MapPin }
 			]
 		},
 		// {

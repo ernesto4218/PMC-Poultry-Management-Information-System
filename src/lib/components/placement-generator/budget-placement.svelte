@@ -97,7 +97,7 @@
 		const key = memoryCacheKey;
 
 		if (!id || !key) return;
-		console.log('Memory from data.memory', data.memory?.[group]);
+		// console.log('Memory from data.memory', data.memory?.[group]);
 
 		//@ts-ignore
 		if (memoryCache[key]) return;
@@ -306,7 +306,7 @@
 			<div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
 				<div>
 					<p class="text-xs font-semibold tracking-wider text-red-700 uppercase">
-						Chick Management
+						Budget & Finance
 					</p>
 
 					<h1 class="mt-1 flex items-center gap-2 text-3xl font-bold tracking-tight text-gray-900">

@@ -3,6 +3,8 @@ import { error } from '@sveltejs/kit';
 
 export const load = async ({ params }) => {
 	const report = await BudgetReportService.getByDocumentId(params.documentId);
+
+	console.log('Report ', report);
 	if (!report) error(404, 'Report not found');
 	return { report }; // render from report.snapshot, not from live farm data
 };

@@ -9,7 +9,7 @@ export const load: PageServerLoad = async () => {
 			MedicationMemoryService.getAll()
 		]);
 
-		console.log('Memory ', memory);
+		// console.log('Memory ', memory);
 		return { batches, memory };
 	} catch (err) {
 		console.error('Failed to load budget placement data:', err);
