@@ -17,7 +17,12 @@ const apiRolePermissions: { route: string; allowedRoles: string[] }[] = [
 	{ route: '/api/standard', allowedRoles: ['Admin'] },
 	{ route: '/api/suppliers', allowedRoles: ['Admin'] },
 	{ route: '/api/moderator', allowedRoles: ['Admin', 'Moderator'] },
-	{ route: '/api/posts/create', allowedRoles: ['Admin', 'Moderator', 'Author'] }
+	{ route: '/api/posts/create', allowedRoles: ['Admin', 'Moderator', 'Author'] },
+	{ route: '/api/budget-reports', allowedRoles: ['Admin'] },
+	{ route: '/api/medication-memory', allowedRoles: ['Admin'] },
+	{ route: '/api/medication-report', allowedRoles: ['Admin'] },
+	{ route: '/api/particulars-memory', allowedRoles: ['Admin'] },
+	{ route: '/api/particulars', allowedRoles: ['Admin'] }
 ];
 
 const handleBetterAuth: Handle = async ({ event, resolve }) => {
