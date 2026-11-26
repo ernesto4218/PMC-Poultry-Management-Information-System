@@ -9,7 +9,7 @@ export const load: PageServerLoad = async ({ request, locals }) => {
 
 	if (session) {
 		if (locals.user.role === 'Admin') {
-			redirect(307, '/admin/standard-management');
+			redirect(307, '/admin/farms');
 		} else {
 			redirect(403, '/unauthorized');
 		}

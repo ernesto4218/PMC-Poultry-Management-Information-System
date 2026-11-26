@@ -59,9 +59,9 @@
 			label: 'Overview',
 			items: [
 				{ title: 'Dashboard', url: '/admin/dashboard', icon: LayoutDashboard },
-				{ title: 'Analytics', url: '/admin/analytics', icon: ChartNoAxesCombined },
-				{ title: 'Standard Management', url: '/admin/standard-management', icon: Shield },
-				{ title: 'Suppliers', url: '/admin/suppliers', icon: Package }
+				{ title: 'Analytics', url: '/admin/analytics', icon: ChartNoAxesCombined }
+				// { title: 'Standard Management', url: '/admin/standard-management', icon: Shield },
+				// { title: 'Suppliers', url: '/admin/suppliers', icon: Package }
 			]
 		},
 		{

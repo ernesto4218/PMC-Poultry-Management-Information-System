@@ -464,75 +464,9 @@
 </div>
 
 <style>
-	/* zoom is set on screen by the fit-to-page calculation, but only takes effect in print */
 	@media print {
 		.fit {
 			zoom: var(--fit, 1);
-		}
-
-		@page {
-			size: 13in 8.5in;
-			margin: 0;
-		}
-
-		:global(html),
-		:global(body) {
-			margin: 0 !important;
-			padding: 0 !important;
-			width: 13in !important;
-			height: 8.5in !important;
-			overflow: hidden !important;
-			background: #fff !important;
-		}
-
-		:global(body *) {
-			visibility: hidden !important;
-		}
-
-		:global(#print-area),
-		:global(#print-area *) {
-			visibility: visible !important;
-			-webkit-print-color-adjust: exact;
-			print-color-adjust: exact;
-		}
-
-		:global(#print-area) {
-			position: fixed !important;
-			top: 0 !important;
-			left: 0 !important;
-			right: auto !important;
-			bottom: auto !important;
-			width: 13in !important;
-			height: 8.5in !important;
-			min-width: 0 !important;
-			min-height: 0 !important;
-			max-width: none !important;
-			max-height: none !important;
-			box-sizing: border-box !important;
-			padding: 0.25in !important;
-			margin: 0 !important;
-			transform: none !important;
-			translate: none !important;
-			scale: none !important;
-			rotate: none !important;
-			animation: none !important;
-			transition: none !important;
-			opacity: 1 !important;
-			overflow: hidden !important;
-			background: #fff !important;
-			border: none !important;
-			border-radius: 0 !important;
-			box-shadow: none !important;
-		}
-
-		:global(#print-area [data-dialog-close]),
-		:global(#print-area > button[type='button']:last-child),
-		:global(#print-area .print\:hidden) {
-			display: none !important;
-		}
-
-		:global(#print-area > *) {
-			height: 8in !important;
 		}
 	}
 </style>

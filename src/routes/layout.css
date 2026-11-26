@@ -1,9 +1,72 @@
 @import 'tailwindcss';
-@import "tw-animate-css";
-@import "shadcn-svelte/tailwind.css";
-@import "@fontsource-variable/geist";
+@import 'tw-animate-css';
+@import 'shadcn-svelte/tailwind.css';
+@import '@fontsource-variable/geist';
 
 @custom-variant dark (&:is(.dark *));
+
+@page {
+	size: 13in 8.5in;
+	margin: 0;
+}
+
+@media print {
+	html,
+	body {
+		margin: 0 !important;
+		padding: 0 !important;
+		width: 13in !important;
+		height: 8.5in !important;
+		overflow: hidden !important;
+		background: #fff !important;
+	}
+
+	body * {
+		visibility: hidden !important;
+	}
+
+	#print-area,
+	#print-area * {
+		visibility: visible !important;
+		-webkit-print-color-adjust: exact;
+		print-color-adjust: exact;
+	}
+
+	#print-area {
+		position: fixed !important;
+		inset: 0 !important;
+		margin: 0 !important;
+		width: 13in !important;
+		height: 8.5in !important;
+		min-width: 0 !important;
+		min-height: 0 !important;
+		max-width: none !important;
+		max-height: none !important;
+		box-sizing: border-box !important;
+		padding: 0.25in !important;
+		transform: none !important;
+		translate: none !important;
+		scale: none !important;
+		rotate: none !important;
+		animation: none !important;
+		transition: none !important;
+		overflow: hidden !important;
+		background: #fff !important;
+		border: none !important;
+		border-radius: 0 !important;
+		box-shadow: none !important;
+	}
+
+	#print-area [data-dialog-close],
+	#print-area > button[type='button']:last-child,
+	#print-area .print\:hidden {
+		display: none !important;
+	}
+
+	#print-area > * {
+		height: 8in !important;
+	}
+}
 
 :root {
 	--background: oklch(1 0 0);
