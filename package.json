@@ -32,6 +32,7 @@
 		"@sveltejs/kit": "^3.0.0",
 		"@sveltejs/vite-plugin-svelte": "^7.2.0",
 		"@tailwindcss/vite": "^4.3.0",
+		"@types/mapbox-gl": "^3.4.1",
 		"@types/node": "^22.20.5",
 		"@types/qrcode": "^1.5.6",
 		"auth": "^1.6.24",
@@ -62,6 +63,7 @@
 		"html2canvas-pro": "^2.5.0",
 		"jsbarcode": "^3.12.3",
 		"jspdf": "^4.2.1",
+		"mapbox-gl": "^3.36.0",
 		"qrcode": "^1.5.4"
 	}
 }

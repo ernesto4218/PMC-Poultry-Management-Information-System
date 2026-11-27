@@ -4,7 +4,6 @@ import type { DateWindow, PullOutRow, SortKey, SortValue, StoreData } from './ty
 import { dayKey, matchesWindow, summarize } from './utils.ts';
 
 export const DEFAULT_CAPACITY = 560;
-
 export interface SupplierProduct {
 	id: string;
 	name: string;
@@ -35,6 +34,16 @@ export interface WarehouseStockOption {
 	stage: string;
 	onHand: number;
 	status: string;
+}
+
+const FEED_STAGE_ORDER = ['booster', 'starter', 'grower'] as const;
+
+function feedRank(feedName: string | undefined | null): number {
+	const normalized = (feedName ?? '').trim().toLowerCase();
+	if (!normalized) return FEED_STAGE_ORDER.length;
+
+	const idx = FEED_STAGE_ORDER.findIndex((stage) => normalized.includes(stage));
+	return idx === -1 ? FEED_STAGE_ORDER.length : idx;
 }
 
 /**
@@ -144,13 +153,26 @@ export class PulloutStore {
 
 		const dir = this.sortDir === 'asc' ? 1 : -1;
 		const compare: Record<SortKey, (a: PullOutRow, b: PullOutRow) => number> = {
-			date: (a, b) => (a.dateKey || '9999').localeCompare(b.dateKey || '9999'),
-			farm: (a, b) => a.farmCode.localeCompare(b.farmCode),
-			feed: (a, b) => a.feedName.localeCompare(b.feedName),
-			amount: (a, b) => a.amountNum - b.amountNum,
-			qty: (a, b) => a.qtyNum - b.qtyNum
+			date: (a, b) => {
+				const dateDiff = (a.dateKey || '9999').localeCompare(b.dateKey || '9999');
+				if (dateDiff !== 0) return dateDiff * dir;
+				// Same date: always Booster -> Starter -> Grower
+				return feedRank(a.feedName) - feedRank(b.feedName);
+			},
+			farm: (a, b) => {
+				const farmDiff = a.farmCode.localeCompare(b.farmCode);
+				if (farmDiff !== 0) return farmDiff * dir;
+				return feedRank(a.feedName) - feedRank(b.feedName);
+			},
+			feed: (a, b) => {
+				const rankDiff = feedRank(a.feedName) - feedRank(b.feedName);
+				if (rankDiff !== 0) return rankDiff * dir;
+				return a.feedName.localeCompare(b.feedName) * dir;
+			},
+			amount: (a, b) => (a.amountNum - b.amountNum) * dir,
+			qty: (a, b) => (a.qtyNum - b.qtyNum) * dir
 		};
-		return out.sort((a, b) => dir * compare[this.sortKey](a, b));
+		return out.sort(compare[this.sortKey]);
 	});
 
 	totalPages = $derived(Math.max(1, Math.ceil(this.filtered.length / this.pageSize)));
@@ -299,6 +321,7 @@ export class PulloutStore {
 				(a, b) =>
 					(a.dateKey || '9999').localeCompare(b.dateKey || '9999') ||
 					a.farmCode.localeCompare(b.farmCode) ||
+					feedRank(a.feedName) - feedRank(b.feedName) ||
 					a.feedName.localeCompare(b.feedName)
 			);
 

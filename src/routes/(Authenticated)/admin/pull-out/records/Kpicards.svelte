@@ -7,14 +7,6 @@
 
 	const cards = $derived([
 		{
-			title: 'Total Feeds',
-			value: String(summary.total),
-			note: `Across ${summary.batches} batches · ${summary.farms} farms`,
-			icon: TruckIcon,
-			iconCls: 'bg-red-50 text-red-700',
-			valueCls: 'text-3xl text-gray-900'
-		},
-		{
 			title: 'Today',
 			value: String(summary.today),
 			note: `${summary.week} scheduled in the next 7 days`,
@@ -29,14 +21,6 @@
 			icon: AlertTriangleIcon,
 			iconCls: 'bg-rose-50 text-rose-700',
 			valueCls: 'text-3xl text-rose-700'
-		},
-		{
-			title: 'Total Value',
-			value: peso(summary.totalAmount),
-			note: 'Sum of all feed pull-out amounts',
-			icon: FileTextIcon,
-			iconCls: 'bg-amber-50 text-amber-700',
-			valueCls: 'truncate text-2xl text-gray-900'
 		}
 	]);
 </script>

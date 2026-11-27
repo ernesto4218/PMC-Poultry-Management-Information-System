@@ -79,17 +79,23 @@
 		};
 	}
 
-	function formatDate(d: string | Date | null | undefined): string {
-		if (!d) return '—';
-		const clean = String(d).slice(0, 10);
-		const parts = clean.split('-');
-		if (parts.length !== 3) return String(d);
-		const [y, m, day] = parts.map(Number);
-		if (!y || !m || !day) return String(d);
-		return new Date(y, m - 1, day).toLocaleDateString('en-US', {
+	function formatDate(
+		d: string | Date | number | null | undefined,
+		locale: string = 'en-US',
+		timeZone?: string
+	): string {
+		if (d === null || d === undefined || d === '') return '—';
+
+		const date = d instanceof Date ? d : new Date(d);
+		if (Number.isNaN(date.getTime())) return String(d);
+
+		return date.toLocaleString(locale, {
 			month: 'short',
 			day: 'numeric',
-			year: 'numeric'
+			year: 'numeric',
+			hour: 'numeric',
+			minute: '2-digit',
+			...(timeZone ? { timeZone } : {})
 		});
 	}
 
