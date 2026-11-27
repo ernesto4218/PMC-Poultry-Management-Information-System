@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import {
 	dispatch,
 	dispatchItem,
@@ -7,6 +7,7 @@ import {
 	feed_stock,
 	feed_stock_movement,
 	feedProduct,
+	feedSupplier,
 	truck
 } from '#lib/server/db/schema.ts';
 import { normalizeFeedName, matchFeedKey } from '#lib/feed-match.ts';
@@ -38,6 +39,47 @@ export type CreateDispatchInput = {
 	items: CreateDispatchItem[];
 };
 
+export type TrackedLoadItem = {
+	id: string;
+	dispatchId: string;
+	documentId: string;
+	rowIndex: number;
+	farmId: string | null;
+	farmCode: string;
+	farmName: string;
+	batchNumber: string;
+	feedName: string;
+	feedProductId: string | null;
+	productName: string | null;
+	supplierName: string | null;
+	scheduledQty: number;
+	loadedQty: number;
+};
+
+export type TrackedDispatch = {
+	id: string;
+	tripCode: string;
+	dispatchDate: string;
+	status: string;
+	totalBags: number;
+	truckCapacity: number;
+	notes: string;
+	truckId: string;
+	plateNumber: string;
+	truckCapacityActual: number;
+	driverId: string;
+	driverName: string;
+	driverPhone: string | null;
+	items: TrackedLoadItem[];
+	arrivalDate: string | null;
+	supplierDrNumber: string | null;
+	drReceivedDate: string | null;
+	forwardedAccountingDate: string | null;
+	saleInvoiceNumber: string | null;
+	amount: number | null;
+	dueDate: string | null;
+};
+
 // ── helpers ────────────────────────────────────────────────────────────────
 
 const keyOf = (documentId: string, rowIndex: number) => `${documentId}::${rowIndex}`;
@@ -61,8 +103,6 @@ async function generateTripCode(): Promise<string> {
 	}
 	throw new Error('Could not allocate a unique trip code');
 }
-
-// ── public API ─────────────────────────────────────────────────────────────
 
 /** Sum of loaded bags per (documentId::rowIndex), excluding cancelled trips. */
 export async function getDispatchedQuantities(): Promise<DispatchedMap> {
@@ -386,4 +426,167 @@ export async function createDispatch(input: CreateDispatchInput) {
 
 		return { dispatchId, tripCode, totalBags, capacity };
 	});
+}
+
+export async function listTrackedDispatches(): Promise<TrackedDispatch[]> {
+	const dispatches = await db
+		.select({
+			id: dispatch.id,
+			tripCode: dispatch.tripCode,
+			dispatchDate: dispatch.dispatchDate,
+			status: dispatch.status,
+			totalBags: dispatch.totalBags,
+			truckCapacity: dispatch.truckCapacity,
+			notes: dispatch.notes,
+			truckId: dispatch.truckId,
+			plateNumber: truck.plateNumber,
+			truckCapacityActual: truck.capacity,
+			driverId: dispatch.driverId,
+			driverName: driver.name,
+			driverPhone: driver.phone,
+			arrivalDate: dispatch.arrivalDate,
+			supplierDrNumber: dispatch.supplierDrNumber,
+			drReceivedDate: dispatch.drReceivedDate,
+			forwardedAccountingDate: dispatch.forwardedAccountingDate,
+			saleInvoiceNumber: dispatch.saleInvoiceNumber,
+			amount: dispatch.amount,
+			dueDate: dispatch.dueDate
+		})
+		.from(dispatch)
+		.leftJoin(truck, eq(dispatch.truckId, truck.id))
+		.leftJoin(driver, eq(dispatch.driverId, driver.id))
+		.where(ne(dispatch.status, 'cancelled'))
+		.orderBy(desc(dispatch.dispatchDate), desc(dispatch.tripCode));
+
+	const dispatchIds = dispatches.map((d) => d.id);
+
+	const rawItems =
+		dispatchIds.length > 0
+			? await db
+					.select({
+						id: dispatchItem.id,
+						dispatchId: dispatchItem.dispatchId,
+						documentId: dispatchItem.documentId,
+						rowIndex: dispatchItem.rowIndex,
+						farmId: dispatchItem.farmId,
+						farmCode: dispatchItem.farmCode,
+						farmName: dispatchItem.farmName,
+						batchNumber: dispatchItem.batchNumber,
+						feedName: dispatchItem.feedName,
+						feedProductId: dispatchItem.feedProductId,
+						productName: feedProduct.name,
+						feedType: feedProduct.feedType,
+						stage: feedProduct.stage,
+						supplierName: feedSupplier.name,
+						scheduledQty: dispatchItem.scheduledQty,
+						loadedQty: dispatchItem.loadedQty
+					})
+					.from(dispatchItem)
+					.leftJoin(feedProduct, eq(dispatchItem.feedProductId, feedProduct.id))
+					.leftJoin(feedSupplier, eq(feedProduct.supplierId, feedSupplier.id))
+					.where(inArray(dispatchItem.dispatchId, dispatchIds))
+			: [];
+
+	const itemsByDispatch = new Map<string, TrackedLoadItem[]>();
+	for (const row of rawItems) {
+		const fallbackProduct =
+			row.productName || [row.feedType, row.stage].filter(Boolean).join(' ') || null;
+		const list = itemsByDispatch.get(row.dispatchId) ?? [];
+		list.push({
+			id: row.id,
+			dispatchId: row.dispatchId,
+			documentId: row.documentId,
+			rowIndex: row.rowIndex,
+			farmId: row.farmId,
+			farmCode: row.farmCode,
+			farmName: row.farmName,
+			batchNumber: row.batchNumber,
+			feedName: row.feedName,
+			feedProductId: row.feedProductId,
+			productName: fallbackProduct,
+			supplierName: row.supplierName,
+			scheduledQty: row.scheduledQty,
+			loadedQty: row.loadedQty
+		});
+		itemsByDispatch.set(row.dispatchId, list);
+	}
+
+	//@ts-ignore
+	return dispatches.map((d) => ({
+		id: d.id,
+		tripCode: d.tripCode,
+		dispatchDate: d.dispatchDate,
+		status: d.status,
+		totalBags: d.totalBags,
+		truckCapacity: d.truckCapacity || d.truckCapacityActual || 560,
+		notes: d.notes ?? '',
+		truckId: d.truckId,
+		plateNumber: d.plateNumber ?? 'Unassigned Truck',
+		truckCapacityActual: d.truckCapacityActual ?? 560,
+		driverId: d.driverId,
+		driverName: d.driverName ?? 'Unassigned Driver',
+		driverPhone: d.driverPhone ?? null,
+		items: itemsByDispatch.get(d.id) ?? [],
+		arrivalDate: d.arrivalDate ?? null,
+		supplierDrNumber: d.supplierDrNumber ?? null,
+		drReceivedDate: d.drReceivedDate ?? null,
+		forwardedAccountingDate: d.forwardedAccountingDate ?? null,
+		saleInvoiceNumber: d.saleInvoiceNumber ?? null,
+		amount: d.amount ?? null,
+		dueDate: d.dueDate ?? null
+	}));
+}
+
+export type UpdateDispatchDeliveryInput = {
+	dispatchId: string;
+	arrivalDate: string | null;
+	supplierDrNumber: string | null;
+	drReceivedDate: string | null;
+	forwardedAccountingDate: string | null;
+	saleInvoiceNumber: string | null;
+	amount: number | null;
+	dueDate: string | null;
+};
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Saves arrival / DR / accounting / invoice details on a trip. */
+export async function updateDispatchDelivery(input: UpdateDispatchDeliveryInput) {
+	const dates: [string, string | null][] = [
+		['arrival date', input.arrivalDate],
+		['DR received date', input.drReceivedDate],
+		['date forwarded to accounting', input.forwardedAccountingDate],
+		['due date', input.dueDate]
+	];
+	for (const [label, v] of dates) {
+		if (v && !DATE_RE.test(v)) throw new Error(`Invalid ${label}`);
+	}
+	if (input.amount !== null && (!Number.isFinite(input.amount) || input.amount < 0)) {
+		throw new Error('Amount must be a number of zero or more');
+	}
+
+	const [row] = await db
+		.select({ id: dispatch.id, status: dispatch.status })
+		.from(dispatch)
+		.where(eq(dispatch.id, input.dispatchId))
+		.limit(1);
+	if (!row) throw new Error('Trip not found');
+	if (row.status === 'cancelled') throw new Error('This trip was cancelled');
+	if (row.status === 'draft')
+		throw new Error('Dispatch the trip before recording delivery details');
+
+	await db
+		.update(dispatch)
+		.set({
+			arrivalDate: input.arrivalDate,
+			supplierDrNumber: input.supplierDrNumber?.slice(0, 60) ?? null,
+			drReceivedDate: input.drReceivedDate,
+			forwardedAccountingDate: input.forwardedAccountingDate,
+			saleInvoiceNumber: input.saleInvoiceNumber?.slice(0, 60) ?? null,
+			amount: input.amount,
+			dueDate: input.dueDate,
+			// Once the truck has arrived, the trip counts as delivered.
+			status: row.status === 'dispatched' && input.arrivalDate ? 'delivered' : row.status
+		})
+		.where(eq(dispatch.id, input.dispatchId));
 }

@@ -726,6 +726,13 @@ export const dispatch = mysqlTable(
 		})
 			.notNull()
 			.default('dispatched'),
+		arrivalDate: date('arrival_date', { mode: 'string' }),
+		supplierDrNumber: varchar('supplier_dr_number', { length: 60 }),
+		drReceivedDate: date('dr_received_date', { mode: 'string' }),
+		forwardedAccountingDate: date('forwarded_accounting_date', { mode: 'string' }),
+		saleInvoiceNumber: varchar('sale_invoice_number', { length: 60 }),
+		amount: decimal('amount', { precision: 14, scale: 2, mode: 'number' }),
+		dueDate: date('due_date', { mode: 'string' }),
 		createdBy: varchar('created_by', { length: 36 }),
 		createdAt: timestamp('created_at').defaultNow().notNull(),
 		updatedAt: timestamp('updated_at').defaultNow().onUpdateNow().notNull()
