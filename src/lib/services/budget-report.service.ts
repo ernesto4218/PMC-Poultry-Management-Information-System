@@ -1,7 +1,7 @@
 import { db } from '#lib/server/db/index.ts';
 import { farm, budget_report, chickBatch } from '#lib/server/db/schema.ts';
 import type { BudgetReportSnapshot, BudgetSnapshotBody } from '#lib/budget/budget-snapshot.ts';
-import { and, desc, eq, gte, inArray, like, lt } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, like, lt, ne } from 'drizzle-orm';
 import { createHash, randomInt, randomUUID } from 'node:crypto';
 
 export type SaveBudgetReportInput = {
@@ -194,5 +194,34 @@ export class BudgetReportService {
 		if (ids.length === 0) return [];
 
 		return db.select().from(budget_report).where(inArray(budget_report.documentId, ids));
+	}
+
+	/**
+	 * Void many reports at once, keyed by documentId.
+	 * Already-void rows are skipped, so the call is idempotent.
+	 * Returns how many rows actually flipped to void.
+	 */
+	static async voidReports(documentIds: string[]): Promise<number> {
+		const ids = Array.from(new Set(documentIds.filter((d) => d && d.trim().length > 0)));
+		if (ids.length === 0) return 0;
+
+		const toVoid = await db
+			.select({ id: budget_report.id })
+			.from(budget_report)
+			.where(and(inArray(budget_report.documentId, ids), ne(budget_report.status, 'void')));
+
+		if (toVoid.length === 0) return 0;
+
+		await db
+			.update(budget_report)
+			.set({ status: 'void' })
+			.where(
+				inArray(
+					budget_report.id,
+					toVoid.map((r) => r.id)
+				)
+			);
+
+		return toVoid.length;
 	}
 }

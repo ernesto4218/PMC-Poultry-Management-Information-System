@@ -35,7 +35,8 @@
 		CornerRightDown,
 		Truck,
 		UserPlus,
-		MapPin
+		MapPin,
+		TruckElectricIcon
 	} from '@lucide/svelte';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
@@ -131,7 +132,11 @@
 					icon: SquareArrowDownExit,
 					children: [
 						{ title: 'Pull out', url: '/admin/pull-out/records', icon: CornerRightDown },
-						{ title: 'Warehouse', url: '/admin/pull-out/warehouse', icon: Warehouse }
+						{
+							title: 'Dispatch Tracking',
+							url: '/admin/pull-out/dispatch-tracker',
+							icon: TruckElectricIcon
+						}
 					]
 				},
 				{ title: 'Trucks', url: '/admin/trucks', icon: Truck },

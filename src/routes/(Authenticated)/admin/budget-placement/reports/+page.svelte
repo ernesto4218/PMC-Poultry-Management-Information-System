@@ -1,9 +1,13 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
+	import { toast } from 'svelte-sonner';
 	import * as Table from '#lib/components/ui/table/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
+	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import {
 		SearchIcon,
 		EyeIcon,
@@ -20,16 +24,16 @@
 		CalendarDaysIcon,
 		ArrowUpDownIcon,
 		ArrowUpIcon,
-		ArrowDownIcon
+		ArrowDownIcon,
+		TriangleAlertIcon
 	} from '@lucide/svelte';
 
-	// Where the detail pages live. Change this one line if you mount the routes elsewhere.
 	const BASE = '/admin/budget-placement/reports';
 
 	type Report = {
 		id: string;
 		documentId: string;
-		farmId: string;
+		farmId: string | null;
 		farmCode: string;
 		farmName: string;
 		chickBatchId: string;
@@ -47,13 +51,14 @@
 	type VolumeFilter = 'all' | 'small' | 'mid' | 'large';
 	type SavedFilter = 'all' | 'today' | 'last-7' | 'last-30' | 'this-month' | 'this-year';
 
+	//@ts-ignore
 	let { data } = $props<{ data: { reports: Report[] } }>();
 
 	const rows = $derived<Report[]>(data.reports ?? []);
 
 	let search = $state('');
 	let farmFilter = $state('all');
-	let statusFilter = $state<StatusFilter>('all');
+	let statusFilter = $state<StatusFilter>('active');
 	let volumeFilter = $state<VolumeFilter>('all');
 	let savedFilter = $state<SavedFilter>('all');
 	let dateFrom = $state('');
@@ -72,9 +77,27 @@
 	let page = $state(1);
 	const pageSize = $derived(Number(pageSizeRaw));
 
+	// ---- Bulk selection state --------------------------------------------
+	let selectedIds = $state<Set<string>>(new Set());
+	let bulkVoidOpen = $state(false);
+	let bulkVoiding = $state(false);
+
+	const selectedCount = $derived(selectedIds.size);
+
+	function toggleSelect(id: string) {
+		const next = new Set(selectedIds);
+		if (next.has(id)) next.delete(id);
+		else next.add(id);
+		selectedIds = next; // reassign so Svelte tracks it
+	}
+
+	function clearSelection() {
+		selectedIds = new Set();
+	}
+
 	// ---- Date helpers (everything is compared in Manila time) ------------
 	const dayKey = (d: Date | string) =>
-		new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }); // YYYY-MM-DD
+		new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
 
 	function daysBetween(aKey: string, bKey: string): number {
 		const [ay, am, ad] = aKey.split('-').map(Number);
@@ -125,13 +148,9 @@
 	const farmOptions = $derived.by(() => {
 		const m = new Map<string, { id: string; name: string; code: string; type: string | null }>();
 		for (const r of rows) {
+			if (!r.farmId) continue;
 			if (!m.has(r.farmId)) {
-				m.set(r.farmId, {
-					id: r.farmId,
-					name: r.farmName,
-					code: r.farmCode,
-					type: r.farmType
-				});
+				m.set(r.farmId, { id: r.farmId, name: r.farmName, code: r.farmCode, type: r.farmType });
 			}
 		}
 		return [...m.values()].sort((a, b) => a.name.localeCompare(b.name));
@@ -158,6 +177,7 @@
 	const topFarms = $derived.by(() => {
 		const m = new Map<string, { name: string; code: string; type: string | null; count: number }>();
 		for (const r of rows) {
+			if (!r.farmId) continue;
 			const cur = m.get(r.farmId) ?? {
 				name: r.farmName,
 				code: r.farmCode,
@@ -173,7 +193,6 @@
 
 	// ---- Filtering + sorting + pagination --------------------------------
 	const filtered = $derived.by(() => {
-		// "B2611…" is a scanned barcode; everything is compared lowercase
 		const q = search.trim().toLowerCase().replace(/^doc-/, '');
 
 		const result = rows.filter((r) => {
@@ -237,6 +256,29 @@
 	const totalPages = $derived(Math.max(1, Math.ceil(filtered.length / pageSize)));
 	const currentPage = $derived(Math.min(page, totalPages));
 	const paginated = $derived(filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize));
+
+	// ---- Header checkbox helpers (operate on the *filtered* non-void rows) ----
+	const selectableFiltered = $derived(filtered.filter((r) => r.status !== 'void'));
+	const allFilteredSelected = $derived(
+		selectableFiltered.length > 0 && selectableFiltered.every((r) => selectedIds.has(r.documentId))
+	);
+	const someFilteredSelected = $derived(
+		!allFilteredSelected && selectableFiltered.some((r) => selectedIds.has(r.documentId))
+	);
+
+	const headerChecked = $derived(
+		allFilteredSelected ? true : someFilteredSelected ? 'indeterminate' : false
+	);
+
+	function toggleSelectAll() {
+		const next = new Set(selectedIds);
+		if (allFilteredSelected) {
+			for (const r of selectableFiltered) next.delete(r.documentId);
+		} else {
+			for (const r of selectableFiltered) next.add(r.documentId);
+		}
+		selectedIds = next;
+	}
 
 	$effect(() => {
 		void search;
@@ -381,7 +423,7 @@
 			</div>
 		</div>
 
-		<!-- KPI CARDS -->
+		<!-- KPI CARDS (unchanged) -->
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
 			<div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
 				<div class="flex items-start justify-between">
@@ -440,9 +482,9 @@
 									style="width: {(f.count / topMax) * 100}%"
 								></div>
 							</div>
-							<span class="w-6 shrink-0 text-right text-xs font-semibold text-gray-700">
-								{f.count}
-							</span>
+							<span class="w-6 shrink-0 text-right text-xs font-semibold text-gray-700"
+								>{f.count}</span
+							>
 						</div>
 					{:else}
 						<p class="text-xs text-gray-400">No reports yet</p>
@@ -453,10 +495,9 @@
 
 		<!-- CONTENT CARD -->
 		<div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-			<!-- Filter bar -->
+			<!-- Filter bar (unchanged) -->
 			<div class="border-b border-gray-100 p-4">
 				<div class="flex flex-wrap items-center gap-2">
-					<!-- Search -->
 					<div class="relative min-w-[220px] flex-1 sm:max-w-xs">
 						<SearchIcon
 							class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400"
@@ -469,7 +510,6 @@
 						/>
 					</div>
 
-					<!-- Farm -->
 					<Select.Root type="single" bind:value={farmFilter}>
 						<Select.Trigger
 							class="h-10 w-[170px] rounded-lg border-gray-300 text-sm"
@@ -498,7 +538,6 @@
 						</Select.Content>
 					</Select.Root>
 
-					<!-- Status -->
 					<Select.Root type="single" bind:value={statusFilter}>
 						<Select.Trigger
 							class="h-10 w-[140px] rounded-lg border-gray-300 text-sm"
@@ -517,21 +556,15 @@
 						</Select.Content>
 					</Select.Root>
 
-					<!-- Volume -->
 					<Select.Root type="single" bind:value={volumeFilter}>
 						<Select.Trigger
 							class="h-10 w-[160px] rounded-lg border-gray-300 text-sm"
 							aria-label="Filter by volume"
 						>
-							{#if volumeFilter === 'all'}
-								All volumes
-							{:else if volumeFilter === 'small'}
-								Under 20,000
-							{:else if volumeFilter === 'mid'}
-								20,000–39,999
-							{:else}
-								40,000+
-							{/if}
+							{#if volumeFilter === 'all'}All volumes
+							{:else if volumeFilter === 'small'}Under 20,000
+							{:else if volumeFilter === 'mid'}20,000–39,999
+							{:else}40,000+{/if}
 						</Select.Trigger>
 						<Select.Content>
 							<Select.Item value="all">All volumes</Select.Item>
@@ -541,25 +574,17 @@
 						</Select.Content>
 					</Select.Root>
 
-					<!-- Saved date -->
 					<Select.Root type="single" bind:value={savedFilter}>
 						<Select.Trigger
 							class="h-10 w-[160px] rounded-lg border-gray-300 text-sm"
 							aria-label="Filter by saved date"
 						>
-							{#if savedFilter === 'all'}
-								Any date
-							{:else if savedFilter === 'today'}
-								Today
-							{:else if savedFilter === 'last-7'}
-								Last 7 days
-							{:else if savedFilter === 'last-30'}
-								Last 30 days
-							{:else if savedFilter === 'this-month'}
-								This month
-							{:else}
-								This year
-							{/if}
+							{#if savedFilter === 'all'}Any date
+							{:else if savedFilter === 'today'}Today
+							{:else if savedFilter === 'last-7'}Last 7 days
+							{:else if savedFilter === 'last-30'}Last 30 days
+							{:else if savedFilter === 'this-month'}This month
+							{:else}This year{/if}
 						</Select.Trigger>
 						<Select.Content>
 							<Select.Item value="all">Any date</Select.Item>
@@ -571,7 +596,6 @@
 						</Select.Content>
 					</Select.Root>
 
-					<!-- Custom date range -->
 					<div class="flex items-center gap-1.5">
 						<Input
 							type="date"
@@ -590,7 +614,6 @@
 						/>
 					</div>
 
-					<!-- Sort -->
 					<Select.Root type="single" bind:value={sortValue}>
 						<Select.Trigger
 							class="h-10 w-[200px] rounded-lg border-gray-300 text-sm"
@@ -629,14 +652,42 @@
 							class="h-10 text-gray-600 hover:text-red-700"
 							onclick={clearFilters}
 						>
-							<XIcon class="mr-1 h-4 w-4" />
-							Clear
+							<XIcon class="mr-1 h-4 w-4" /> Clear
 						</Button>
 					{/if}
 				</div>
 			</div>
 
-			<!-- Sort-icon snippet -->
+			<!-- NEW: BULK ACTION BAR -->
+			{#if selectedCount > 0}
+				<div
+					class="flex flex-wrap items-center justify-between gap-2 border-b border-red-200 bg-red-50 px-4 py-2.5"
+				>
+					<p class="text-sm font-semibold text-red-900">
+						{selectedCount}
+						{selectedCount === 1 ? 'report' : 'reports'} selected
+					</p>
+					<div class="flex items-center gap-2">
+						<Button
+							variant="ghost"
+							size="sm"
+							class="text-red-800 hover:bg-red-100"
+							onclick={clearSelection}
+						>
+							Clear
+						</Button>
+						<Button
+							size="sm"
+							class="bg-red-700 text-white hover:bg-red-600"
+							onclick={() => (bulkVoidOpen = true)}
+						>
+							<BanIcon class="mr-1.5 h-4 w-4" />
+							Void selected
+						</Button>
+					</div>
+				</div>
+			{/if}
+
 			{#snippet sortIcon(key: SortKey)}
 				{#if sortKey === key}
 					{#if sortDir === 'asc'}
@@ -649,7 +700,6 @@
 				{/if}
 			{/snippet}
 
-			<!-- Empty state snippet (shared by table and grid) -->
 			{#snippet emptyState()}
 				<div class="mx-auto flex max-w-sm flex-col items-center text-center">
 					<div
@@ -674,6 +724,15 @@
 				<Table.Root>
 					<Table.Header class="bg-stone-50">
 						<Table.Row class="hover:bg-transparent">
+							<!-- NEW: Select-all -->
+							<Table.Head class="w-10 pr-0">
+								<Checkbox
+									checked={headerChecked}
+									onCheckedChange={toggleSelectAll}
+									disabled={selectableFiltered.length === 0}
+									aria-label="Select all visible reports"
+								/>
+							</Table.Head>
 							<Table.Head class={thCls}>
 								<button
 									type="button"
@@ -758,6 +817,15 @@
 					<Table.Body>
 						{#each paginated as row (row.id)}
 							<Table.Row class="group transition-colors hover:bg-amber-50/40">
+								<!-- NEW: Row checkbox -->
+								<Table.Cell class="w-10 pr-0">
+									<Checkbox
+										checked={selectedIds.has(row.documentId)}
+										onCheckedChange={() => toggleSelect(row.documentId)}
+										disabled={row.status === 'void'}
+										aria-label="Select {row.documentId}"
+									/>
+								</Table.Cell>
 								<Table.Cell>
 									<a
 										href="{BASE}/{row.documentId}"
@@ -830,7 +898,7 @@
 							</Table.Row>
 						{:else}
 							<Table.Row class="hover:bg-transparent">
-								<Table.Cell colspan={8} class="py-16">
+								<Table.Cell colspan={9} class="py-16">
 									{@render emptyState()}
 								</Table.Cell>
 							</Table.Row>
@@ -881,9 +949,15 @@
 												<span class="truncate">{row.farmName} · {row.batchNumber}</span>
 											</p>
 										</div>
-										<EyeIcon
-											class="h-4 w-4 text-gray-400 opacity-60 transition-opacity group-hover:opacity-100"
-										/>
+
+										<div role="presentation" onclick={(e) => e.stopPropagation()}>
+											<Checkbox
+												checked={selectedIds.has(row.documentId)}
+												onCheckedChange={() => toggleSelect(row.documentId)}
+												disabled={row.status === 'void'}
+												aria-label="Select {row.documentId}"
+											/>
+										</div>
 									</div>
 
 									<div class="mt-4 grid grid-cols-3 gap-2 border-t border-gray-100 pt-3">
@@ -919,7 +993,7 @@
 				</div>
 			{/if}
 
-			<!-- Pagination -->
+			<!-- Pagination (unchanged) -->
 			{#if rows.length > 0}
 				<div
 					class="flex flex-col gap-3 border-t border-gray-100 bg-stone-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
@@ -990,3 +1064,78 @@
 		</div>
 	</div>
 </div>
+
+<!-- NEW: BULK VOID CONFIRMATION -->
+<Dialog.Root bind:open={bulkVoidOpen}>
+	<Dialog.Content class="sm:max-w-md">
+		<Dialog.Header>
+			<div
+				class="mb-2 flex h-11 w-11 items-center justify-center rounded-full bg-red-50 text-red-700"
+			>
+				<TriangleAlertIcon class="h-5 w-5" />
+			</div>
+			<Dialog.Title>
+				Void {selectedCount}
+				{selectedCount === 1 ? 'budget report' : 'budget reports'}?
+			</Dialog.Title>
+			<Dialog.Description>
+				The selected reports will be marked as void. They stay on record for the audit trail and
+				print with a VOID mark. This can't be undone.
+			</Dialog.Description>
+		</Dialog.Header>
+
+		<form
+			method="POST"
+			action="?/void"
+			use:enhance={() => {
+				bulkVoiding = true;
+				return async ({ result, update }) => {
+					await update();
+					bulkVoiding = false;
+
+					if (result.type === 'success') {
+						const voided = (result.data as { voided?: number } | null)?.voided ?? selectedCount;
+						const requested =
+							(result.data as { requested?: number } | null)?.requested ?? selectedCount;
+
+						bulkVoidOpen = false;
+						clearSelection();
+
+						if (voided === 0) {
+							toast.info('Those reports were already void.');
+						} else if (voided < requested) {
+							toast.success(
+								`${voided} of ${requested} reports voided (${requested - voided} were already void).`
+							);
+						} else {
+							toast.success(`${voided} ${voided === 1 ? 'report' : 'reports'} voided`);
+						}
+					} else {
+						toast.error('Could not void the reports. Please try again.');
+					}
+				};
+			}}
+		>
+			{#each [...selectedIds] as documentId (documentId)}
+				<input type="hidden" name="documentIds" value={documentId} />
+			{/each}
+			<Dialog.Footer class="gap-2 sm:gap-2">
+				<Button
+					type="button"
+					variant="outline"
+					disabled={bulkVoiding}
+					onclick={() => (bulkVoidOpen = false)}
+				>
+					Cancel
+				</Button>
+				<Button
+					type="submit"
+					disabled={bulkVoiding}
+					class="bg-red-700 font-semibold text-white hover:bg-red-600"
+				>
+					{bulkVoiding ? 'Voiding…' : `Void ${selectedCount}`}
+				</Button>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>

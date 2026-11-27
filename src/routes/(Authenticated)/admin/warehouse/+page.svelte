@@ -706,16 +706,6 @@
 				<Table.Root>
 					<Table.Header class="bg-stone-50">
 						<Table.Row class="hover:bg-transparent">
-							<Table.Head class={thCls}>
-								<button
-									type="button"
-									onclick={() => toggleInvSort('name')}
-									class="inline-flex items-center gap-1 hover:text-gray-700"
-									aria-sort={invAria('name')}
-								>
-									Product {@render invSortIcon('name')}
-								</button>
-							</Table.Head>
 							<Table.Head class="{thCls} hidden md:table-cell">
 								<button
 									type="button"
@@ -755,16 +745,6 @@
 					<Table.Body>
 						{#each paginatedInventory as row (row.feedProductId)}
 							<Table.Row class="group transition-colors hover:bg-amber-50/40">
-								<Table.Cell>
-									<div class="flex flex-col">
-										<span class="font-semibold text-gray-900">
-											{row.productName}
-											{#if row.sku}
-												<Badge variant="secondary" class="ml-2">{row.sku}</Badge>
-											{/if}
-										</span>
-									</div>
-								</Table.Cell>
 								<Table.Cell class="hidden text-sm text-gray-700 md:table-cell">
 									{row.supplierName}
 								</Table.Cell>

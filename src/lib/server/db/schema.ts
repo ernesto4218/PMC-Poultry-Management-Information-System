@@ -702,4 +702,70 @@ export const feed_stock_movement = mysqlTable(
 	]
 );
 
+// ---------------------------------------------------------------------------
+// Dispatch / Load Planning
+// ---------------------------------------------------------------------------
+export const dispatch = mysqlTable(
+	'dispatch',
+	{
+		id: varchar('id', { length: 36 }).primaryKey(),
+		tripCode: varchar('trip_code', { length: 30 }).notNull(),
+		truckId: varchar('truck_id', { length: 36 }).references(() => truck.id, {
+			onDelete: 'restrict'
+		}),
+		driverId: varchar('driver_id', { length: 36 }).references(() => driver.id, {
+			onDelete: 'set null'
+		}),
+		dispatchDate: date('dispatch_date').notNull(),
+		truckCapacity: int('truck_capacity').notNull().default(560),
+		totalBags: int('total_bags').notNull().default(0),
+		notes: varchar('notes', { length: 500 }).notNull().default(''),
+		status: varchar('status', {
+			length: 20,
+			enum: ['draft', 'dispatched', 'delivered', 'cancelled']
+		})
+			.notNull()
+			.default('dispatched'),
+		createdBy: varchar('created_by', { length: 36 }),
+		createdAt: timestamp('created_at').defaultNow().notNull(),
+		updatedAt: timestamp('updated_at').defaultNow().onUpdateNow().notNull()
+	},
+	(t) => [
+		uniqueIndex('dispatch_trip_code_unique').on(t.tripCode),
+		index('dispatch_date_idx').on(t.dispatchDate),
+		index('dispatch_status_idx').on(t.status),
+		index('dispatch_truck_idx').on(t.truckId)
+	]
+);
+
+export const dispatchItem = mysqlTable(
+	'dispatch_item',
+	{
+		id: varchar('id', { length: 36 }).primaryKey(),
+		dispatchId: varchar('dispatch_id', { length: 36 })
+			.notNull()
+			.references(() => dispatch.id, { onDelete: 'cascade' }),
+		// Stable pointer into budget_report.snapshot.rows[rowIndex]
+		documentId: varchar('document_id', { length: 12 }).notNull(),
+		rowIndex: int('row_index').notNull(),
+		// Denormalised (snapshot-immutable) so the dispatch record stands alone
+		farmId: varchar('farm_id', { length: 36 }).references(() => farm.id, { onDelete: 'set null' }),
+		farmCode: varchar('farm_code', { length: 150 }).notNull().default(''),
+		farmName: varchar('farm_name', { length: 150 }).notNull().default(''),
+		batchNumber: varchar('batch_number', { length: 100 }).notNull().default(''),
+		feedName: varchar('feed_name', { length: 150 }).notNull().default(''),
+		feedProductId: varchar('feed_product_id', { length: 36 }).references(() => feedProduct.id, {
+			onDelete: 'set null'
+		}),
+		scheduledQty: int('scheduled_qty').notNull(),
+		loadedQty: int('loaded_qty').notNull(),
+		createdAt: timestamp('created_at').defaultNow().notNull()
+	},
+	(t) => [
+		index('dispatch_item_dispatch_idx').on(t.dispatchId),
+		index('dispatch_item_ref_idx').on(t.documentId, t.rowIndex),
+		index('dispatch_item_feed_idx').on(t.feedProductId),
+		index('dispatch_item_farm_idx').on(t.farmId)
+	]
+);
 export * from './auth.schema';

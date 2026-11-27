@@ -19,6 +19,8 @@ export const load: PageServerLoad = async () => {
 				ChickBatchService.getAllBatches()
 			]);
 
+		console.log(products);
+
 		return { inventory, movements, products, suppliers, farms, drivers, trucks, chickBatches };
 	} catch (err) {
 		console.error('Failed to load warehouse data:', err);
