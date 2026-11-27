@@ -7,6 +7,7 @@ RUN DATABASE_URL="mysql://user:pass@localhost:3306/db" \
     ORIGIN="http://localhost:3000" \
     BETTER_AUTH_SECRET="build-only-placeholder-0123456789abcdef" \
     BETTER_AUTH_URL="http://localhost:3000" \
+    PUBLIC_MAPBOX_TOKEN="build-only-placeholder-0123456789abcdef" \
     npm run build
 RUN npm prune --omit=dev
 
