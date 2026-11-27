@@ -3,7 +3,7 @@
 	import type { PulloutStore } from './pullout-store.svelte.ts';
 	import type { SortKey } from './types.ts';
 	import EmptyState from './EmptyState.svelte';
-	import PulloutRow from './PulloutRow.svelte';
+	import PulloutRow from './Pulloutrow.svelte';
 	import SortHead from './SortHead.svelte';
 
 	let { store }: { store: PulloutStore } = $props();
